@@ -1,0 +1,46 @@
+# Training Platform Requirements
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+websockets>=12.0
+
+# Data Validation
+pydantic>=2.5.0
+
+# Database
+sqlmodel>=0.0.14
+sqlalchemy>=2.0.0
+
+# Configuration
+pyyaml>=6.0.1
+hydra-core>=1.3.2
+
+# ML/DL Core
+torch>=2.1.0
+transformers>=4.35.0
+safetensors>=0.4.0
+
+# Training Frameworks
+# verl  # Install from source
+
+# Ray (for job submission)
+ray[default]>=2.9.0
+
+# Vector Store (optional)
+pymilvus>=2.3.0
+openai>=1.0.0  # For embeddings via Dashscope
+
+# Utilities
+numpy>=1.24.0
+tqdm>=4.66.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0
+
+# Optional: Monitoring
+# wandb>=0.16.0
+# tensorboard>=2.15.0

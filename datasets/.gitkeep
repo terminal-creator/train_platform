@@ -1,0 +1,37 @@
+# 训练数据集目录
+# Training Datasets Directory
+
+将训练数据文件放在此目录下，平台会自动检测并在创建任务时显示下拉选项。
+
+## 支持的格式
+- .parquet (推荐)
+- .jsonl
+- .json
+- .csv
+
+## 数据格式示例
+
+### SFT (监督微调)
+```json
+{"messages": [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]}
+```
+
+### GRPO/PPO
+```json
+{"prompt": "...", "response": "..."}
+```
+
+### DPO
+```json
+{"prompt": "...", "chosen": "...", "rejected": "..."}
+```
+
+## 目录结构示例
+```
+datasets/
+├── sft_data.parquet          # SFT 训练数据
+├── grpo_train.jsonl          # GRPO 训练数据
+├── dpo_preferences.parquet   # DPO 偏好数据
+└── eval/
+    └── test_set.jsonl        # 评估数据集
+```

@@ -1,0 +1,706 @@
+<html lang="en" class="scroll-smooth"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Intelligence Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+    <style>
+    body { font-family: 'Inter', sans-serif; background-color: #050505; color: #ffffff; }
+    .glass-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px); }
+    .neon-text { color: #FF9EB5; text-shadow: 0 0 20px rgba(255, 158, 181, 0.3); }
+    .neon-bg { background-color: #FF9EB5; box-shadow: 0 0 20px rgba(255, 158, 181, 0.3); }
+    .chart-gradient { background: linear-gradient(180deg, rgba(255, 158, 181, 0.2) 0%, rgba(255, 158, 181, 0) 100%); }
+    /* Custom details marker hide */
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    </style></head>
+    <body class="antialiased selection:bg-pink-500 selection:text-white">
+    
+        <!-- Navbar -->
+        <nav class="fixed top-0 w-full z-50 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md">
+            <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-pink-300 to-pink-500 flex items-center justify-center text-black">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="zap" class="lucide lucide-zap w-5 h-5 fill-current"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>
+                    </div>
+                </div>
+                
+                <div class="hidden md:flex items-center gap-8 text-sm text-gray-400 font-medium">
+                    <a href="#" class="hover:text-white transition-colors">Home</a>
+                    <a href="#" class="hover:text-white transition-colors">About</a>
+                    <a href="#" class="hover:text-white transition-colors">Product</a>
+                    <a href="#" class="hover:text-white transition-colors">Pricing</a>
+                    <a href="#" class="hover:text-white transition-colors">Blog</a>
+                </div>
+    
+                <button class="bg-[#FF9EB5] hover:bg-[#ff8fa8] text-black px-5 py-2 rounded-full text-sm font-medium transition-all transform hover:scale-105">
+                    Contact Us
+                </button>
+            </div>
+        </nav>
+    
+        <!-- Hero Section -->
+        <header class="overflow-hidden pt-40 pr-6 pb-20 pl-6 relative">
+            <!-- Background Glow -->
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-pink-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+    
+            <div class="max-w-4xl mx-auto text-center relative z-10">
+                <div class="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-8 font-medium">
+                    Amazing features
+                </div>
+                <h1 class="text-5xl md:text-7xl font-medium tracking-tight leading-[1.1] mb-6">
+                    Manage Your Data For<br>
+                    <span class="text-gray-400">Simplified Dashboard.</span>
+                </h1>
+                <p class="text-lg text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed font-light">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum at est ut odio cursus efficitur. Cras pharetra consectetur mi, nec eleifend justo pharetra vel.
+                </p>
+                <button class="bg-[#FF9EB5] hover:bg-[#ff8fa8] text-black px-8 py-3 rounded-full text-base font-medium transition-all shadow-[0_0_20px_rgba(255,158,181,0.3)]">
+                    Get Started
+                </button>
+            </div>
+    
+            <!-- Dashboard Visualization -->
+            <div class="max-w-5xl mx-auto mt-20 relative">
+                <div class="glass-card rounded-3xl p-1 border border-white/10 shadow-2xl">
+                    <div class="bg-[#0A0A0A] rounded-[20px] p-6 md:p-10 flex flex-col md:flex-row gap-8 relative overflow-hidden">
+                        
+                        <!-- Left: Credit Score Gauge -->
+                        <div class="w-full md:w-1/3 bg-[#111111] rounded-2xl p-6 flex flex-col items-center justify-between border border-white/5 relative">
+                            <div class="w-full flex justify-between text-xs text-gray-500 mb-4 font-medium">
+                                <span>YOUR CREDIT SCORE</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="more-horizontal" class="lucide lucide-more-horizontal w-4 h-4"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+                            </div>
+                            <div class="relative w-48 h-24 mb-4">
+                                <!-- SVG Gauge -->
+                                <svg viewBox="0 0 200 100" class="w-full h-full">
+                                    <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#333" stroke-width="12" stroke-linecap="round"></path>
+                                    <path d="M 20 100 A 80 80 0 0 1 140 30" fill="none" stroke="#FF9EB5" stroke-width="12" stroke-linecap="round" stroke-dasharray="251" stroke-dashoffset="0"></path>
+                                </svg>
+                                <div class="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+                                    <div class="text-4xl font-medium text-white">660</div>
+                                </div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-sm font-medium text-gray-300">Your Credit Score is average</div>
+                                <div class="text-xs text-gray-500 mt-1">Last check on 21 Apr</div>
+                            </div>
+                        </div>
+    
+                        <!-- Right: Bar Chart -->
+                        <div class="w-full md:w-2/3 bg-[#111111] rounded-2xl p-6 border border-white/5 relative">
+                            <div class="flex justify-between items-start mb-8">
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1 font-medium">Spendings</div>
+                                    <div class="text-xl font-medium">Brooklyn Simmons</div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="download" class="lucide lucide-download w-4 h-4 text-gray-400"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>
+                                    </div>
+                                </div>
+                            </div>
+    
+                            <!-- Bars -->
+                            <div class="h-32 flex items-end justify-between gap-2 md:gap-4 px-2">
+                                <!-- Bar Item -->
+                                <div class="w-full bg-gray-800/30 rounded-t-md h-[40%] relative group"></div>
+                                <div class="w-full bg-[#FF9EB5] rounded-t-md h-[70%] relative group shadow-[0_0_15px_rgba(255,158,181,0.2)]"></div>
+                                <div class="w-full bg-gray-800/30 rounded-t-md h-[50%] relative group"></div>
+                                <div class="w-full bg-[#FF9EB5] rounded-t-md h-[30%] relative group shadow-[0_0_15px_rgba(255,158,181,0.2)]"></div>
+                                <div class="w-full bg-gray-800/30 rounded-t-md h-[60%] relative group"></div>
+                                <div class="w-full bg-gray-800/30 rounded-t-md h-[45%] relative group"></div>
+                                <div class="w-full bg-[#FF9EB5] rounded-t-md h-[85%] relative group shadow-[0_0_15px_rgba(255,158,181,0.2)]"></div>
+                                <div class="w-full bg-gray-800/30 rounded-t-md h-[55%] relative group"></div>
+                                <div class="w-full bg-gray-800/30 rounded-t-md h-[40%] relative group"></div>
+                            </div>
+                            
+                            <!-- X Axis -->
+                            <div class="flex justify-between mt-4 text-xs text-gray-600 font-medium px-1">
+                                <span>Current margin</span>
+                                <span class="text-white">$350.00</span>
+                            </div>
+                        </div>
+    
+                        <!-- Floating User Tag -->
+                        <div class="absolute bottom-6 right-6 bg-[#1A1A1A] border border-white/10 p-3 rounded-xl flex items-center gap-3 shadow-2xl z-20">
+                            <div class="text-right">
+                                <div class="text-sm font-medium text-white">$124,20</div>
+                                <div class="text-[10px] text-gray-500">21 Apr, 19:59</div>
+                            </div>
+                            <span class="bg-pink-500/20 text-pink-300 text-xs px-2 py-0.5 rounded-full font-medium">+3.4%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+    
+        <!-- Logos -->
+        <section class="py-10 border-b border-white/5">
+            <p class="text-center text-xs text-gray-600 mb-8 font-medium">Trusted by Top-tier product companies</p>
+            <div class="max-w-6xl mx-auto px-6 flex flex-wrap justify-center gap-12 md:gap-20 opacity-40 grayscale">
+                <!-- Mock Logos -->
+                <div class="flex items-center gap-2 text-xl font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="triangle" class="lucide lucide-triangle fill-white"><path d="M13.73 4a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path></svg> PLAID</div>
+                <div class="flex items-center gap-2 text-xl font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="hexagon" class="lucide lucide-hexagon fill-white"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg> Griffin</div>
+                <div class="flex items-center gap-2 text-xl font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="box" class="lucide lucide-box fill-white"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg> airbnb</div>
+                <div class="flex items-center gap-2 text-xl font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="circle" class="lucide lucide-circle fill-white"><circle cx="12" cy="12" r="10"></circle></svg> PATREON</div>
+                <div class="flex items-center gap-2 text-xl font-semibold"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="command" class="lucide lucide-command fill-white"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"></path></svg> HelpScout</div>
+            </div>
+        </section>
+    
+        <!-- Feature 1 -->
+        <section class="py-32 px-6 max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-2 gap-20 items-center">
+                <div>
+                    <h2 class="text-4xl md:text-5xl font-medium tracking-tight mb-6 leading-[1.1]">
+                        Drive Results With Hurix<br>
+                        for Marketers &amp; Product
+                    </h2>
+                    <p class="text-lg text-gray-400 mb-10 leading-relaxed font-light">
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum at est ut odio cursus efficitur. Cras pharetra consectetur mi, nec eleifend justo pharetra vel.
+                    </p>
+                    <div class="space-y-4">
+                        <div class="flex gap-4">
+                            <div class="w-2 h-2 rounded-full bg-pink-400 mt-2"></div>
+                            <div>
+                                <h4 class="text-sm font-medium text-white">Easy-to-adopt sales software</h4>
+                                <p class="text-sm text-gray-500 mt-1">That leverages AI for best results.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="w-2 h-2 rounded-full bg-pink-400 mt-2"></div>
+                            <div>
+                                <h4 class="text-sm font-medium text-white">Customer service software</h4>
+                                <p class="text-sm text-gray-500 mt-1">Powered by next-gen infrastructure.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+    
+                <!-- Visual Feature 1 -->
+                <div class="relative">
+                    <div class="bg-[#0A0A0A] border border-white/5 rounded-3xl p-8 relative z-10">
+                        <div class="flex justify-between items-end mb-8">
+                            <div>
+                                <div class="text-xs text-gray-500 uppercase tracking-wider mb-2 font-medium">Accenture Analysis</div>
+                                <div class="text-4xl font-medium text-white">12,3K</div>
+                            </div>
+                            <div class="text-right space-y-3">
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1 font-medium">SPENDING</div>
+                                    <div class="flex items-center gap-2 text-sm font-medium">2,3K <span class="text-[10px] bg-pink-500/20 text-pink-300 px-1 rounded">+11.4%</span></div>
+                                </div>
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1 font-medium">ALLOCATION</div>
+                                    <div class="flex items-center gap-2 text-sm font-medium">1,6K <span class="text-[10px] bg-white/10 text-gray-300 px-1 rounded">+4.0%</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-end gap-3 h-32">
+                            <div class="w-full bg-gradient-to-t from-pink-300 to-pink-100 h-[60%] rounded-md opacity-80"></div>
+                            <div class="w-full bg-white/5 h-[30%] rounded-md"></div>
+                            <div class="w-full bg-white/5 h-[45%] rounded-md"></div>
+                            <div class="w-full bg-white/5 h-[70%] rounded-md"></div>
+                            <div class="w-full bg-white/5 h-[40%] rounded-md"></div>
+                            <div class="w-full bg-gradient-to-t from-pink-300 to-pink-100 h-[80%] rounded-md opacity-80"></div>
+                            <div class="w-full bg-white/5 h-[35%] rounded-md"></div>
+                            <div class="w-full bg-white/5 h-[50%] rounded-md"></div>
+                        </div>
+                    </div>
+    
+                    <!-- Floating Card Overlay -->
+                    <div class="absolute -right-6 top-20 bg-[#151515] border border-white/10 p-6 rounded-2xl w-64 shadow-2xl z-20 hidden md:block">
+                        <div class="text-xs text-gray-500 mb-2 font-medium uppercase">Allocation</div>
+                        <div class="text-3xl font-medium text-white mb-4">89%</div>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <div class="h-6 w-full bg-gray-800 rounded overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-pink-200 to-pink-400 w-[89%]"></div>
+                                </div>
+                                <div class="text-[10px] text-gray-500 mt-1">1 day ago</div>
+                            </div>
+                            <div>
+                                <div class="h-6 w-full bg-gray-800 rounded overflow-hidden">
+                                    <div class="h-full bg-white/10 w-[30%]"></div>
+                                </div>
+                                <div class="text-[10px] text-gray-500 mt-1 text-right w-[30%]">30 mins ago</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    
+        <!-- Feature 2: Streamlined -->
+        <section class="py-20 bg-[#080808]">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="text-center mb-20">
+                    <h2 class="text-3xl md:text-5xl font-medium tracking-tight mb-2">Customer Feedback</h2>
+                    <h2 class="text-3xl md:text-5xl font-medium tracking-tight text-gray-500">Data Intelligence Leader</h2>
+                </div>
+    
+                <div class="grid md:grid-cols-2 gap-20 items-center">
+                    <!-- Text Left -->
+                    <div>
+                        <div class="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-6 font-medium">
+                            Amazing features
+                        </div>
+                        <h3 class="text-4xl font-medium tracking-tight mb-6 leading-tight">Streamlined collaboration<br>in easiest ways</h3>
+                        <p class="text-lg text-gray-400 mb-10 leading-relaxed font-light">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum at est ut odio cursus efficitur.
+                        </p>
+                        
+                        <div class="space-y-8">
+                            <div class="flex gap-4">
+                                <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="zap" class="lucide lucide-zap w-5 h-5 text-pink-300"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>
+                                </div>
+                                <div>
+                                    <h4 class="text-base font-medium text-white">Faster deployment</h4>
+                                    <p class="text-sm text-gray-500 mt-1 font-light">Lorem ipsum dolor sit amet, consectetur.</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="star" class="lucide lucide-star w-5 h-5 text-pink-300"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path></svg>
+                                </div>
+                                <div>
+                                    <h4 class="text-base font-medium text-white">Effortless integration</h4>
+                                    <p class="text-sm text-gray-500 mt-1 font-light">Lorem ipsum dolor sit amet, consectetur.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+    
+                    <!-- Card Right -->
+                    <div class="bg-[#111111] border border-white/5 rounded-3xl p-8 md:p-10 relative">
+                        <div class="mb-8">
+                            <div class="text-xs text-gray-400 font-medium mb-1">Your Assets</div>
+                            <div class="text-4xl md:text-5xl font-medium text-white mb-2">124,420<span class="text-gray-500 text-3xl">.50</span></div>
+                            <div class="text-sm text-gray-500">You gained +$420.00 this week</div>
+                        </div>
+                        
+                        <div class="flex gap-2 mb-8">
+                            <span class="px-3 py-1 rounded-full bg-pink-200 text-black text-xs font-medium">All Assets</span>
+                            <span class="px-3 py-1 rounded-full border border-white/10 text-gray-400 text-xs font-medium">Dollar</span>
+                        </div>
+    
+                        <!-- List Items -->
+                        <div class="space-y-3">
+                            <div class="bg-[#1A1A1A] p-4 rounded-xl flex items-center justify-between border border-white/5">
+                                <div class="flex items-center gap-3">
+                                    <div class="text-sm font-medium">Pound</div>
+                                    <!-- Mini Line Chart -->
+                                    <svg width="60" height="20" class="stroke-gray-500 fill-none" stroke-width="1.5">
+                                        <polyline points="0,15 10,10 20,18 30,5 40,12 50,8 60,15"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-sm font-medium">$23,378</span>
+                                    <span class="text-[10px] text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded">+3.4%</span>
+                                </div>
+                            </div>
+                            <div class="bg-[#1A1A1A] p-4 rounded-xl flex items-center justify-between border border-white/5">
+                                <div class="flex items-center gap-3">
+                                    <div class="text-sm font-medium">Dollars</div>
+                                    <!-- Mini Line Chart -->
+                                    <svg width="60" height="20" class="stroke-gray-500 fill-none" stroke-width="1.5">
+                                        <polyline points="0,10 10,15 20,8 30,12 40,5 50,15 60,8"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-sm font-medium">$89,293</span>
+                                    <span class="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">-0.1%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    
+        <!-- Feature 3: Workflow -->
+        <section class="py-20 px-6 max-w-7xl mx-auto">
+            <div class="grid md:grid-cols-2 gap-20 items-center">
+                <!-- Left Chart Card -->
+                <div class="bg-[#111111] border border-white/5 rounded-3xl p-6 md:p-8">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <div class="text-xs text-gray-500 font-medium mb-1">Spendings</div>
+                            <div class="text-xl font-medium text-white">Brooklyn Simmons</div>
+                        </div>
+                        <div class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="download" class="lucide lucide-download w-4 h-4 text-gray-400"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>
+                        </div>
+                    </div>
+    
+                    <!-- Area Chart -->
+                    <div class="relative h-48 w-full">
+                        <!-- Grid Lines -->
+                        <div class="absolute inset-0 flex flex-col justify-between text-[10px] text-gray-600">
+                            <div class="border-b border-white/5 w-full pb-1">800</div>
+                            <div class="border-b border-white/5 w-full pb-1">600</div>
+                            <div class="border-b border-white/5 w-full pb-1">400</div>
+                            <div class="border-b border-white/5 w-full pb-1">200</div>
+                            <div class="w-full">0</div>
+                        </div>
+                        <!-- Chart Line -->
+                        <svg viewBox="0 0 400 200" class="absolute inset-0 w-full h-full preserve-3d">
+                            <defs>
+                                <linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="#FF9EB5" stop-opacity="0.2"></stop>
+                                    <stop offset="100%" stop-color="#FF9EB5" stop-opacity="0"></stop>
+                                </linearGradient>
+                            </defs>
+                            <path d="M0 180 C 50 180, 80 140, 120 150 S 180 80, 220 100 S 300 40, 400 60 V 200 H 0 Z" fill="url(#gradient)"></path>
+                            <path d="M0 180 C 50 180, 80 140, 120 150 S 180 80, 220 100 S 300 40, 400 60" fill="none" stroke="#FF9EB5" stroke-width="2"></path>
+                            <!-- Tooltip Dot -->
+                            <circle cx="280" cy="70" r="4" fill="#FF9EB5" class="shadow-[0_0_10px_#FF9EB5]"></circle>
+                        </svg>
+                        <!-- Floating Label -->
+                        <div class="absolute top-[25%] left-[65%] bg-pink-100 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            $20.34
+                        </div>
+                    </div>
+    
+                    <!-- X Axis -->
+                    <div class="flex justify-between text-[10px] text-gray-500 mt-2 px-1">
+                        <span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span><span>Nov</span><span>Dec</span>
+                    </div>
+    
+                    <!-- Progress Bar Bottom -->
+                    <div class="mt-6">
+                        <div class="flex justify-between text-xs mb-2">
+                            <span class="text-white font-medium">Usage</span>
+                            <span class="text-gray-500">80 GB out of 100 GB used</span>
+                        </div>
+                        <div class="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-pink-300 w-[80%] rounded-full"></div>
+                        </div>
+                    </div>
+                </div>
+    
+                <!-- Right Text -->
+                <div>
+                    <div class="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-6 font-medium">
+                        Amazing features
+                    </div>
+                    <h3 class="text-4xl font-medium tracking-tight mb-6 leading-tight">Workflow without anyStreamlining</h3>
+                    <p class="text-lg text-gray-400 mb-8 leading-relaxed font-light">
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum at est ut odio. Cras pharetra consectetur mi, nec eleifend justo pharetra vel.
+                    </p>
+                    
+                    <div class="flex gap-6 mb-8 text-sm text-white font-medium">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle" class="lucide lucide-check-circle w-4 h-4 text-pink-300"><path d="M21.801 10A10 10 0 1 1 17 3.335"></path><path d="m9 11 3 3L22 4"></path></svg> Free migration
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle" class="lucide lucide-check-circle w-4 h-4 text-pink-300"><path d="M21.801 10A10 10 0 1 1 17 3.335"></path><path d="m9 11 3 3L22 4"></path></svg> Simplified onboarding
+                        </div>
+                    </div>
+    
+                    <button class="bg-[#FF9EB5] hover:bg-[#ff8fa8] text-black px-6 py-2.5 rounded-full text-sm font-medium transition-all">
+                        Get In Touch
+                    </button>
+                </div>
+            </div>
+        </section>
+    
+        <!-- Integrations -->
+        <section class="py-20 text-center">
+            <div class="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-6 font-medium">
+                Amazing features
+            </div>
+            <h2 class="text-4xl md:text-5xl font-medium tracking-tight mb-16">
+                Connect the apps weintegrate with
+            </h2>
+    
+            <div class="max-w-4xl mx-auto flex flex-wrap justify-center gap-4 px-6">
+                <!-- Integration Pill 1 -->
+                <div class="bg-[#111111] border border-white/5 rounded-full pl-2 pr-6 py-2 flex items-center gap-3 min-w-[200px] hover:border-pink-500/30 transition-colors cursor-pointer group">
+                    <div class="w-10 h-10 rounded-full bg-pink-200 text-black flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="link" class="lucide lucide-link w-5 h-5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-medium text-white">Mailstack</div>
+                        <div class="text-[10px] text-gray-500 group-hover:text-pink-300">Description Mailstack</div>
+                    </div>
+                </div>
+                <!-- Integration Pill 2 -->
+                <div class="bg-[#111111] border border-white/5 rounded-full pl-2 pr-6 py-2 flex items-center gap-3 min-w-[200px] hover:border-pink-500/30 transition-colors cursor-pointer group">
+                    <div class="w-10 h-10 rounded-full bg-pink-100 text-black flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="aperture" class="lucide lucide-aperture w-5 h-5"><circle cx="12" cy="12" r="10"></circle><path d="m14.31 8 5.74 9.94"></path><path d="M9.69 8h11.48"></path><path d="m7.38 12 5.74-9.94"></path><path d="M9.69 16 3.95 6.06"></path><path d="M14.31 16H2.83"></path><path d="m16.62 12-5.74 9.94"></path></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-medium text-white">Mailstack</div>
+                        <div class="text-[10px] text-gray-500 group-hover:text-pink-300">Description Mailstack</div>
+                    </div>
+                </div>
+                 <!-- Integration Pill 3 -->
+                 <div class="bg-[#111111] border border-white/5 rounded-full pl-2 pr-6 py-2 flex items-center gap-3 min-w-[200px] hover:border-pink-500/30 transition-colors cursor-pointer group">
+                    <div class="w-10 h-10 rounded-full bg-pink-50 text-black flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="command" class="lucide lucide-command w-5 h-5"><path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"></path></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-medium text-white">Mailstack</div>
+                        <div class="text-[10px] text-gray-500 group-hover:text-pink-300">Description Mailstack</div>
+                    </div>
+                </div>
+                 <!-- Integration Pill 4 -->
+                 <div class="bg-[#111111] border border-white/5 rounded-full pl-2 pr-6 py-2 flex items-center gap-3 min-w-[200px] hover:border-pink-500/30 transition-colors cursor-pointer group mt-4">
+                    <div class="w-10 h-10 rounded-full bg-pink-200 text-black flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="mail" class="lucide lucide-mail w-5 h-5"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path><rect x="2" y="4" width="20" height="16" rx="2"></rect></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-medium text-white">Mailstack</div>
+                        <div class="text-[10px] text-gray-500 group-hover:text-pink-300">Description Mailstack</div>
+                    </div>
+                </div>
+                 <!-- Integration Pill 5 -->
+                 <div class="bg-[#111111] border border-white/5 rounded-full pl-2 pr-6 py-2 flex items-center gap-3 min-w-[200px] hover:border-pink-500/30 transition-colors cursor-pointer group mt-4">
+                    <div class="w-10 h-10 rounded-full bg-pink-100 text-black flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="slack" class="lucide lucide-slack w-5 h-5"><rect width="3" height="8" x="13" y="2" rx="1.5"></rect><path d="M19 8.5V10h1.5A1.5 1.5 0 1 0 19 8.5"></path><rect width="3" height="8" x="8" y="14" rx="1.5"></rect><path d="M5 15.5V14H3.5A1.5 1.5 0 1 0 5 15.5"></path><rect width="8" height="3" x="14" y="13" rx="1.5"></rect><path d="M15.5 19H14v1.5a1.5 1.5 0 1 0 1.5-1.5"></path><rect width="8" height="3" x="2" y="8" rx="1.5"></rect><path d="M8.5 5H10V3.5A1.5 1.5 0 1 0 8.5 5"></path></svg>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm font-medium text-white">Mailstack</div>
+                        <div class="text-[10px] text-gray-500 group-hover:text-pink-300">Description Mailstack</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    
+        <!-- Testimonials -->
+        <section class="pt-20 pb-20 relative">
+            <div class="max-w-7xl mx-auto px-6 text-center mb-16">
+                <div class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6 backdrop-blur-sm border border-white/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="message-circle" class="lucide lucide-message-circle w-6 h-6 fill-white text-white"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"></path></svg>
+                </div>
+                <h2 class="text-4xl md:text-5xl font-medium tracking-tight">
+                    Don't take our wordsListen theirs
+                </h2>
+            </div>
+    
+            <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Testimonial Item 1 -->
+                <div class="hover:border-white/10 transition-colors bg-[#111111] border-white/5 border rounded-2xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&amp;fit=crop&amp;w=64&amp;h=64" class="w-10 h-10 rounded-full object-cover grayscale opacity-70" alt="User">
+                        <div class="text-left">
+                            <div class="text-sm font-medium text-white">Lorri Warf</div>
+                            <div class="text-[10px] text-gray-500">Marketing Leader @Holan</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-light">"This finance app template is a game-changer! It's user-friendly, making budgeting and financial tracking a breeze."</p>
+                </div>
+    
+                <!-- Testimonial Item 2 -->
+                <div class="bg-[#111111] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&amp;fit=crop&amp;w=64&amp;h=64" class="w-10 h-10 rounded-full object-cover grayscale opacity-70" alt="User">
+                        <div class="text-left">
+                            <div class="text-sm font-medium text-white">David Chen</div>
+                            <div class="text-[10px] text-gray-500">CTO @Manter</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-light">"It's intuitive, functional, easy-to-setup and presents content in an interactive way. Highly recommended!"</p>
+                </div>
+    
+                <!-- Testimonial Item 3 -->
+                <div class="bg-[#111111] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&amp;fit=crop&amp;w=64&amp;h=64" class="w-10 h-10 rounded-full object-cover grayscale opacity-70" alt="User">
+                        <div class="text-left">
+                            <div class="text-sm font-medium text-white">Sarah Jones</div>
+                            <div class="text-[10px] text-gray-500">Product @Vercel</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-light">"Efficient. I highly recommend it for anyone looking to take control of their finances with style."</p>
+                </div>
+    
+                <!-- Testimonial Item 4 -->
+                <div class="bg-[#111111] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&amp;fit=crop&amp;w=64&amp;h=64" class="w-10 h-10 rounded-full object-cover grayscale opacity-70" alt="User">
+                        <div class="text-left">
+                            <div class="text-sm font-medium text-white">Mike Ross</div>
+                            <div class="text-[10px] text-gray-500">Designer @Figma</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-light">"The dark mode implementation is flawless. Just what I needed for my late night sessions."</p>
+                </div>
+    
+                <!-- Testimonial Item 5 -->
+                 <div class="bg-[#111111] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&amp;fit=crop&amp;w=64&amp;h=64" class="w-10 h-10 rounded-full object-cover grayscale opacity-70" alt="User">
+                        <div class="text-left">
+                            <div class="text-sm font-medium text-white">James Will</div>
+                            <div class="text-[10px] text-gray-500">CEO @Tech</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-light">"Superb functionality wrapped in a beautiful design. The charts are particularly impressive."</p>
+                </div>
+    
+                <!-- Testimonial Item 6 -->
+                 <div class="bg-[#111111] p-6 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                    <div class="flex items-center gap-3 mb-4">
+                        <img src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&amp;fit=crop&amp;w=64&amp;h=64" class="w-10 h-10 rounded-full object-cover grayscale opacity-70" alt="User">
+                        <div class="text-left">
+                            <div class="text-sm font-medium text-white">Lisa M.</div>
+                            <div class="text-[10px] text-gray-500">HR @Stripe</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed font-light">"Finally, software that feels like it was designed for humans. Integration was seamless."</p>
+                </div>
+            </div>
+        </section>
+    
+        <!-- Bottom CTA -->
+        <section class="py-32 flex justify-center px-6">
+            <div class="bg-[#111111] border border-white/10 rounded-[3rem] p-12 text-center max-w-4xl w-full relative overflow-hidden">
+                 <!-- Background Glow -->
+                 <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-pink-500/10 rounded-full blur-[80px] pointer-events-none"></div>
+    
+                <div class="relative z-10">
+                    <div class="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-6 font-medium">
+                        Amazing features
+                    </div>
+                    <h2 class="text-5xl md:text-6xl font-medium tracking-tight mb-4">
+                        Build a businesswith purpose
+                    </h2>
+                    
+                    <div class="max-w-md mx-auto mt-10 p-6 bg-[#1A1A1A]/80 backdrop-blur border border-white/10 rounded-2xl shadow-2xl">
+                        <p class="text-xs text-gray-400 mb-4 font-light">It's intuitive, functional, easy-to-setup and presents content in an interactive and interesting way.</p>
+                        <input type="email" placeholder="Hello@gmail.com" class="w-full bg-[#0A0A0A] border border-white/10 rounded-lg px-4 py-3 text-sm text-white mb-3 focus:outline-none focus:border-pink-500/50">
+                        <button class="w-full bg-[#FF9EB5] hover:bg-[#ff8fa8] text-black rounded-lg py-3 text-sm font-medium mb-4 transition-colors">
+                            Download Now!
+                        </button>
+                        <div class="flex items-center gap-4 text-[10px] text-gray-500 justify-center">
+                            <div class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check" class="lucide lucide-check w-3 h-3"><path d="M20 6 9 17l-5-5"></path></svg> Integrate Algorithms</div>
+                            <div class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="star" class="lucide lucide-star w-3 h-3"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"></path></svg> Comment Collection</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    
+        <!-- FAQ Section -->
+        <section class="py-20 max-w-3xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <div class="inline-flex items-center px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-300 mb-4 font-medium">
+                    Support
+                </div>
+                <h2 class="text-4xl font-medium tracking-tight">Frequently Asked Questions</h2>
+            </div>
+    
+            <div class="space-y-4">
+                <!-- FAQ Item 1 -->
+                <details class="group bg-[#111111] border border-white/5 rounded-2xl overflow-hidden [&amp;_summary::-webkit-details-marker]:hidden open:border-white/10">
+                    <summary class="flex items-center justify-between p-6 cursor-pointer text-white font-medium select-none hover:bg-white/5 transition-colors">
+                        <span>How does the integration work?</span>
+                        <span class="transition-transform duration-200 group-open:rotate-180 text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="chevron-down" class="lucide lucide-chevron-down w-5 h-5"><path d="m6 9 6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div class="px-6 pb-6 text-sm text-gray-400 font-light leading-relaxed">
+                        Our platform connects directly with your existing financial accounts via secure API. We support over 50+ integrations including Plaid, Stripe, and PayPal to ensure your data is always up-to-date and accurate.
+                    </div>
+                </details>
+    
+                <!-- FAQ Item 2 -->
+                <details class="group bg-[#111111] border border-white/5 rounded-2xl overflow-hidden [&amp;_summary::-webkit-details-marker]:hidden open:border-white/10">
+                    <summary class="flex items-center justify-between p-6 cursor-pointer text-white font-medium select-none hover:bg-white/5 transition-colors">
+                        <span>Is my data secure?</span>
+                        <span class="transition-transform duration-200 group-open:rotate-180 text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="chevron-down" class="lucide lucide-chevron-down w-5 h-5"><path d="m6 9 6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div class="px-6 pb-6 text-sm text-gray-400 font-light leading-relaxed">
+                        Security is our top priority. We use bank-grade encryption (AES-256) and never sell your personal data. We are SOC2 compliant and regularly audited by third-party security firms.
+                    </div>
+                </details>
+    
+                <!-- FAQ Item 3 -->
+                <details class="group bg-[#111111] border border-white/5 rounded-2xl overflow-hidden [&amp;_summary::-webkit-details-marker]:hidden open:border-white/10">
+                    <summary class="flex items-center justify-between p-6 cursor-pointer text-white font-medium select-none hover:bg-white/5 transition-colors">
+                        <span>Can I export my reports?</span>
+                        <span class="transition-transform duration-200 group-open:rotate-180 text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="chevron-down" class="lucide lucide-chevron-down w-5 h-5"><path d="m6 9 6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div class="px-6 pb-6 text-sm text-gray-400 font-light leading-relaxed">
+                        Yes, you can export all your reports in CSV, PDF, or Excel formats. You can also schedule automated email reports to be sent to your team or accountant on a weekly or monthly basis.
+                    </div>
+                </details>
+    
+                <!-- FAQ Item 4 -->
+                <details class="group bg-[#111111] border border-white/5 rounded-2xl overflow-hidden [&amp;_summary::-webkit-details-marker]:hidden open:border-white/10">
+                    <summary class="flex items-center justify-between p-6 cursor-pointer text-white font-medium select-none hover:bg-white/5 transition-colors">
+                        <span>What happens after the trial ends?</span>
+                        <span class="transition-transform duration-200 group-open:rotate-180 text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="chevron-down" class="lucide lucide-chevron-down w-5 h-5"><path d="m6 9 6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div class="px-6 pb-6 text-sm text-gray-400 font-light leading-relaxed">
+                        If you don't upgrade to a paid plan, your account will automatically switch to our Free tier. You won't lose any data, but access to premium features like advanced analytics and team members will be locked.
+                    </div>
+                </details>
+            </div>
+        </section>
+    
+        <!-- Footer -->
+        <footer class="border-t border-white/5 pt-20 pb-10 mt-20 bg-black text-sm">
+            <div class="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-5 gap-10 mb-20">
+                <div class="col-span-2 md:col-span-1">
+                    <div class="flex items-center gap-2 mb-6">
+                        <div class="w-6 h-6 rounded bg-gradient-to-br from-pink-300 to-pink-500 flex items-center justify-center text-black">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="zap" class="lucide lucide-zap w-4 h-4 fill-current"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path></svg>
+                        </div>
+                        <span class="font-semibold text-lg">Hurix</span>
+                    </div>
+                </div>
+                
+                <div class="flex flex-col gap-3">
+                    <span class="text-white font-medium mb-2">Features</span>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Home</a>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">About</a>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Product</a>
+                </div>
+    
+                <div class="flex flex-col gap-3">
+                    <span class="text-white font-medium mb-2">Solutions</span>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Pricing</a>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Blog</a>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Blog Article</a>
+                </div>
+    
+                <div class="flex flex-col gap-3">
+                    <span class="text-white font-medium mb-2">Company</span>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Contact</a>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Login</a>
+                    <a href="#" class="text-gray-500 hover:text-white transition-colors">Signup</a>
+                </div>
+    
+                <div class="col-span-2 md:col-span-1">
+                    <span class="text-white font-medium mb-4 block">Email</span>
+                    <input type="email" placeholder="hello@djectstudio.com" class="w-full bg-[#111] border border-white/10 rounded px-3 py-2 text-xs text-white mb-2">
+                    <button class="w-full bg-pink-200 text-black py-2 rounded text-xs font-medium hover:bg-pink-300 transition-colors">Sign up</button>
+                </div>
+            </div>
+    
+            <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-xs text-gray-600 pt-8 border-t border-white/5">
+                <div>Copyright ©2024 Djectstudio.com</div>
+                <div class="flex gap-6 mt-4 md:mt-0">
+                    <a href="#" class="hover:text-white">Privacy Policy</a>
+                    <a href="#" class="hover:text-white">Terms of Service</a>
+                </div>
+            </div>
+        </footer>
+    
+        <script>
+            lucide.createIcons();
+        </script>
+    
+    </body></html>

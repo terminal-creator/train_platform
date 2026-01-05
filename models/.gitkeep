@@ -1,0 +1,39 @@
+# 模型存储目录
+
+将下载的模型放在这里。
+
+## 目录结构示例
+
+```
+models/
+├── Qwen2.5-0.5B-Instruct/     # 小模型 (测试用)
+├── Qwen2.5-7B-Instruct/       # 中等模型
+├── Qwen2.5-72B-Instruct/      # 大模型
+└── checkpoints/               # 训练检查点
+    └── grpo-exp1-step1000/
+```
+
+## 下载模型
+
+### 方式一: HuggingFace Hub
+
+```bash
+# 安装
+pip install huggingface_hub
+
+# 下载 (国内建议使用镜像)
+export HF_ENDPOINT=https://hf-mirror.com
+huggingface-cli download Qwen/Qwen2.5-7B-Instruct --local-dir ./models/Qwen2.5-7B-Instruct
+```
+
+### 方式二: ModelScope (国内推荐)
+
+```bash
+pip install modelscope
+python -c "from modelscope import snapshot_download; snapshot_download('Qwen/Qwen2.5-7B-Instruct', cache_dir='./models')"
+```
+
+## 注意
+
+- 模型文件很大 (7B 约 14GB)，不会被 git 跟踪
+- 确保有足够的磁盘空间
