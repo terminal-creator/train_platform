@@ -950,7 +950,18 @@ async def get_resource_usage(job_id: str) -> ResourceUsageResponse:
 async def websocket_live_metrics(websocket: WebSocket, job_id: str):
     """
     WebSocket endpoint for real-time metrics streaming.
+
+    Phase 1.3 重构：
+    - 从真实的指标文件读取数据（本地或 SSH）
+    - 增量推送新增的指标
+    - 推送训练状态（running, completed, failed）
+    - 支持历史回放（playback=true）
     """
+    from ...core.database import get_session, TrainingJob, JobStatus
+    from ...core.metrics_reader import create_metrics_reader
+    from ...core.ssh_runner import get_ssh_manager
+    from sqlmodel import select
+
     await websocket.accept()
 
     # Track connection
@@ -959,24 +970,90 @@ async def websocket_live_metrics(websocket: WebSocket, job_id: str):
     _ws_connections[job_id].append(websocket)
 
     try:
+        # 1. 查询任务信息并获取配置（修复 P1: Session 泄漏）
+        from ...core.database import engine, Session as DBSession
+
+        with DBSession(engine) as session:
+            statement = select(TrainingJob).where(TrainingJob.job_id == job_id)
+            job = session.exec(statement).first()
+
+            if not job:
+                await websocket.send_json({
+                    "error": "Job not found",
+                    "job_id": job_id
+                })
+                return
+
+            # 在 session 关闭前读取所有需要的数据
+            run_mode = job.run_mode_config.get("mode", "local") if job.run_mode_config else "local"
+            ssh_config = job.run_mode_config if run_mode == "ssh" else None
+
+        # 2. 创建指标读取器（使用已读取的配置数据）
+        if run_mode == "ssh" and ssh_config:
+            metrics_dir = f"{ssh_config.get('ssh_working_dir', '~/verl_jobs')}/platform_metrics"
+            ssh_manager = get_ssh_manager(
+                host=ssh_config["ssh_host"],
+                port=ssh_config.get("ssh_port", 22),
+                username=ssh_config["ssh_username"],
+                password=ssh_config.get("ssh_password"),
+                key_path=ssh_config.get("ssh_key_path")
+            )
+            reader = create_metrics_reader(job_id, metrics_dir, run_mode="ssh", ssh_manager=ssh_manager)
+        else:
+            # 本地模式：默认指标目录
+            metrics_dir = "./platform_metrics"
+            reader = create_metrics_reader(job_id, metrics_dir, run_mode="local")
+
+        logger.info(f"[WebSocket] Streaming metrics for {job_id} (mode: {run_mode})")
+
+        # 3. 实时推送指标
         while True:
-            # In real implementation, this would stream actual metrics
-            import random
+            # 读取新增的指标
+            new_metrics, _ = reader.read_metrics_incremental(limit=10)
 
-            metrics = {
-                "timestamp": datetime.utcnow().isoformat(),
-                "step": random.randint(0, 10000),
-                "policy_loss": random.uniform(0.1, 1.0),
-                "reward_mean": random.uniform(-0.5, 0.5),
-                "kl_divergence": random.uniform(0.01, 0.1),
-                "throughput_tokens_per_sec": random.uniform(1000, 2000),
-            }
+            # 读取状态
+            status = reader.read_status()
 
-            await websocket.send_json(metrics)
-            await asyncio.sleep(1)  # Send every second
+            # 推送每个新增指标
+            for metric in new_metrics:
+                await websocket.send_json({
+                    "type": "metric",
+                    "data": metric
+                })
+
+            # 推送状态更新
+            if status:
+                await websocket.send_json({
+                    "type": "status",
+                    "data": status
+                })
+
+            # 如果任务已完成或失败，停止推送
+            if status and status.get("status") in ["completed", "failed"]:
+                logger.info(f"[WebSocket] Job {job_id} finished: {status.get('status')}")
+                await websocket.send_json({
+                    "type": "finished",
+                    "status": status.get("status")
+                })
+                break
+
+            # 等待 1 秒再读取
+            await asyncio.sleep(1)
 
     except WebSocketDisconnect:
+        logger.info(f"[WebSocket] Client disconnected: {job_id}")
         _ws_connections[job_id].remove(websocket)
+    except Exception as e:
+        logger.error(f"[WebSocket] Error streaming metrics for {job_id}: {e}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": str(e)
+            })
+        except:
+            pass
+        if websocket in _ws_connections.get(job_id, []):
+            _ws_connections[job_id].remove(websocket)
 
 
 @router.post("/{job_id}/alert-rules")
@@ -1044,6 +1121,412 @@ async def acknowledge_alert(job_id: str, alert_id: str) -> Dict[str, Any]:
     }
 
 
+# ============== Phase 1: Metrics Query Endpoints (from Database) ==============
+
+@router.get("/{job_id}/metrics")
+async def get_metrics_history(
+    job_id: str,
+    start_step: Optional[int] = Query(None, description="Start step (inclusive)"),
+    end_step: Optional[int] = Query(None, description="End step (inclusive)"),
+    limit: int = Query(1000, ge=1, le=10000, description="Max metrics to return"),
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    查询训练指标历史（Phase 1）
+
+    从数据库查询指标数据，支持步骤范围过滤。
+
+    为什么添加这个接口：
+    - PlatformCallback 将指标持久化到数据库
+    - 前端需要查询历史指标用于绘制图表
+    - 支持范围查询，避免一次返回过多数据
+
+    返回字段说明：
+    - step: 训练步骤
+    - epoch: 当前 epoch
+    - loss: Loss 指标（actor_loss, critic_loss, total_loss）
+    - reward: 奖励指标（mean, std, max, min）
+    - kl: KL 散度（mean, max）
+    - gradient: 梯度范数
+    - performance: 性能指标（吞吐量、耗时等）
+    - has_anomaly: 是否有异常
+    """
+    from ...core.database import JobRepository, MetricsRepository, TrainingMetric
+
+    job_repo = JobRepository(session)
+    metrics_repo = MetricsRepository(session)
+
+    # 验证任务存在
+    job = job_repo.get_by_uuid(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    # 查询指标
+    db_metrics = metrics_repo.get_metrics(
+        job_uuid=job_id,
+        start_step=start_step,
+        end_step=end_step,
+        limit=limit,
+    )
+
+    # 转换为前端友好的格式
+    # 为什么：前端需要嵌套结构便于图表库使用
+    metrics_list = []
+    for m in db_metrics:
+        metrics_list.append({
+            "step": m.step,
+            "epoch": m.epoch,
+            "timestamp": m.timestamp.isoformat(),
+            "loss": {
+                "actor_loss": m.policy_loss,  # 映射回 actor_loss
+                "critic_loss": m.value_loss,  # 映射回 critic_loss
+                "total_loss": m.total_loss,
+            },
+            "reward": {
+                "mean": m.reward_mean,
+                "std": m.reward_std,
+                "max": m.reward_max,
+                "min": m.reward_min,
+            },
+            "kl": {
+                "mean": m.kl_divergence,
+                "max": m.kl_divergence_max,
+            },
+            "gradient": {
+                "actor_norm": m.grad_norm_actor,
+                "critic_norm": m.grad_norm_critic,
+            },
+            "performance": {
+                "tokens_per_second": m.tokens_per_second,
+                "step_time": m.step_time,
+                "gpu_memory_allocated": m.gpu_memory_allocated_gib,
+            },
+            "has_anomaly": m.has_anomaly,
+            "anomaly_type": m.anomaly_type,
+            "anomaly_message": m.anomaly_message,
+        })
+
+    return {
+        "job_id": job_id,
+        "metrics": metrics_list,
+        "total": len(metrics_list),
+        "start_step": start_step,
+        "end_step": end_step,
+    }
+
+
+@router.get("/{job_id}/metrics/anomalies")
+async def get_anomalous_metrics(
+    job_id: str,
+    anomaly_type: Optional[str] = Query(None, description="Filter by anomaly type (nan, kl_explosion, loss_plateau)"),
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    查询异常指标（Phase 1）
+
+    返回所有标记为异常的训练步骤，用于异常分析和告警。
+
+    为什么需要这个接口：
+    - PlatformCallback 自动检测异常并标记到数据库
+    - 前端需要显示异常告警和异常步骤列表
+    - 支持按异常类型筛选
+
+    异常类型：
+    - nan: NaN/Inf 检测
+    - kl_explosion: KL 散度爆炸
+    - loss_plateau: Loss 长期不下降
+    """
+    from ...core.database import JobRepository, TrainingMetric
+    from sqlmodel import select
+
+    job_repo = JobRepository(session)
+
+    # 验证任务存在
+    job = job_repo.get_by_uuid(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    # 查询异常指标
+    statement = select(TrainingMetric).where(
+        TrainingMetric.job_uuid == job_id,
+        TrainingMetric.has_anomaly == True
+    )
+
+    if anomaly_type:
+        statement = statement.where(TrainingMetric.anomaly_type == anomaly_type)
+
+    statement = statement.order_by(TrainingMetric.step)
+    anomalies = session.exec(statement).all()
+
+    # 转换为前端格式
+    anomaly_list = []
+    for a in anomalies:
+        anomaly_list.append({
+            "step": a.step,
+            "epoch": a.epoch,
+            "timestamp": a.timestamp.isoformat(),
+            "anomaly_type": a.anomaly_type,
+            "anomaly_message": a.anomaly_message,
+            "metrics_snapshot": {
+                "actor_loss": a.policy_loss,
+                "reward_mean": a.reward_mean,
+                "kl_mean": a.kl_divergence,
+                "kl_max": a.kl_divergence_max,
+            }
+        })
+
+    return {
+        "job_id": job_id,
+        "anomalies": anomaly_list,
+        "total": len(anomaly_list),
+        "anomaly_type": anomaly_type,
+    }
+
+
+@router.post("/{job_id}/metrics/sync")
+async def sync_metrics_from_files(
+    job_id: str,
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    手动触发指标同步（Phase 1）
+
+    从 PlatformCallback 生成的 JSON Lines 文件同步指标到数据库。
+
+    工作流程：
+    1. 读取 {job_id}_metrics.jsonl 文件
+    2. 解析新增的指标（增量同步）
+    3. 批量插入数据库
+    4. 同步异常信息
+
+    为什么需要手动同步：
+    - 训练过程中可能需要立即查看最新指标
+    - 定时同步可能有延迟
+    - 便于测试和调试
+
+    使用场景：
+    - 前端点击"刷新"按钮时调用
+    - 训练完成后确保所有指标已同步
+    """
+    from ...core.database import JobRepository
+    from ...core.metrics_persister import sync_metrics_for_job
+    from pathlib import Path
+    import os
+
+    job_repo = JobRepository(session)
+
+    # 验证任务存在
+    job = job_repo.get_by_uuid(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    # 获取指标文件目录
+    # 为什么：PlatformCallback 将指标写入 platform_metrics 目录
+    metrics_dir = Path(os.getenv("PLATFORM_METRICS_DIR", "./platform_metrics"))
+
+    try:
+        # 执行同步
+        result = sync_metrics_for_job(
+            job_uuid=job_id,
+            job_id=job_id,  # 假设 job_id 用于文件名
+            metrics_dir=metrics_dir,
+            session=session,
+        )
+
+        return {
+            "success": True,
+            "job_id": job_id,
+            "new_metrics_count": result["new_metrics_count"],
+            "anomaly_synced": result["anomaly_synced"],
+            "message": f"Synced {result['new_metrics_count']} new metrics",
+        }
+
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Metrics file not found: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to sync metrics: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to sync metrics: {str(e)}"
+        )
+
+
+@router.websocket("/{job_id}/playback")
+async def websocket_metrics_playback(
+    websocket: WebSocket,
+    job_id: str,
+    start_step: int = Query(0, description="Start step for playback"),
+    end_step: Optional[int] = Query(None, description="End step for playback"),
+    speed: float = Query(1.0, ge=0.1, le=10.0, description="Playback speed multiplier (1.0 = real-time)"),
+):
+    """
+    历史指标回放 WebSocket (Phase 1.3)
+
+    允许前端以指定速度回放历史训练指标，类似视频回放。
+
+    为什么需要回放功能：
+    - 分析训练过程：回看训练中的关键时刻
+    - 调试问题：定位异常发生的步骤
+    - 演示展示：向他人展示训练过程
+    - 对比实验：同步回放多个实验的指标
+
+    参数说明：
+    - start_step: 从哪个 step 开始回放（默认 0）
+    - end_step: 到哪个 step 结束（None 表示到最后）
+    - speed: 播放速度（1.0 = 真实速度，2.0 = 2倍速，0.5 = 0.5倍速）
+
+    消息格式：
+    {
+        "type": "metric",
+        "data": {...},  # 指标数据
+        "progress": 0.5  # 播放进度 (0-1)
+    }
+    """
+    from ...core.database import get_session, MetricsRepository
+    from sqlmodel import Session
+
+    await websocket.accept()
+
+    try:
+        # 查询指标数据（修复 P1: Session 泄漏）
+        from ...core.database import engine, Session as DBSession
+
+        with DBSession(engine) as session:
+            metrics_repo = MetricsRepository(session)
+
+            # 获取指标列表
+            db_metrics = metrics_repo.get_metrics(
+                job_uuid=job_id,
+                start_step=start_step,
+                end_step=end_step,
+                limit=10000,  # 回放模式允许更多数据
+            )
+
+            if not db_metrics:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": f"No metrics found for job {job_id}"
+                })
+                return
+
+            # 在 session 关闭前将 ORM 对象转换为字典
+            # 避免在 session 外访问 lazy-loaded 属性
+            metrics_data = []
+            for metric in db_metrics:
+                metrics_data.append({
+                    "step": metric.step,
+                    "epoch": metric.epoch,
+                    "timestamp": metric.timestamp,
+                    "policy_loss": metric.policy_loss,
+                    "value_loss": metric.value_loss,
+                    "total_loss": metric.total_loss,
+                    "reward_mean": metric.reward_mean,
+                    "reward_std": metric.reward_std,
+                    "reward_max": metric.reward_max,
+                    "reward_min": metric.reward_min,
+                    "kl_divergence": metric.kl_divergence,
+                    "kl_divergence_max": metric.kl_divergence_max,
+                    "grad_norm_actor": metric.grad_norm_actor,
+                    "grad_norm_critic": metric.grad_norm_critic,
+                    "tokens_per_second": metric.tokens_per_second,
+                    "step_time": metric.step_time,
+                    "gpu_memory_allocated_gib": metric.gpu_memory_allocated_gib,
+                    "has_anomaly": metric.has_anomaly,
+                    "anomaly_type": metric.anomaly_type,
+                })
+
+        total_metrics = len(metrics_data)
+        logger.info(f"[Playback] Starting playback for {job_id}: {total_metrics} metrics, speed={speed}x")
+
+        # 发送回放元信息
+        await websocket.send_json({
+            "type": "playback_info",
+            "total_metrics": total_metrics,
+            "start_step": start_step,
+            "end_step": metrics_data[-1]["step"] if metrics_data else None,
+            "speed": speed,
+        })
+
+        # 逐个推送指标
+        for idx, metric in enumerate(metrics_data):
+            # 转换为前端格式
+            metric_data = {
+                "step": metric["step"],
+                "epoch": metric["epoch"],
+                "timestamp": metric["timestamp"].isoformat(),
+                "loss": {
+                    "actor_loss": metric["policy_loss"],
+                    "critic_loss": metric["value_loss"],
+                    "total_loss": metric["total_loss"],
+                },
+                "reward": {
+                    "mean": metric["reward_mean"],
+                    "std": metric["reward_std"],
+                    "max": metric["reward_max"],
+                    "min": metric["reward_min"],
+                },
+                "kl": {
+                    "mean": metric["kl_divergence"],
+                    "max": metric["kl_divergence_max"],
+                },
+                "gradient": {
+                    "actor_norm": metric["grad_norm_actor"],
+                    "critic_norm": metric["grad_norm_critic"],
+                },
+                "performance": {
+                    "tokens_per_second": metric["tokens_per_second"],
+                    "step_time": metric["step_time"],
+                    "gpu_memory_allocated": metric["gpu_memory_allocated_gib"],
+                },
+                "has_anomaly": metric["has_anomaly"],
+                "anomaly_type": metric["anomaly_type"],
+            }
+
+            # 计算播放进度
+            progress = (idx + 1) / total_metrics
+
+            # 发送指标
+            await websocket.send_json({
+                "type": "metric",
+                "data": metric_data,
+                "progress": progress,
+                "current_index": idx,
+                "total": total_metrics,
+            })
+
+            # 根据速度延迟
+            # 为什么：模拟真实训练的时间间隔
+            # 假设每个 step 间隔 1 秒（可以根据 step_time 调整）
+            base_interval = 0.5  # 基础间隔（秒）
+            if metric["step_time"]:
+                base_interval = min(metric["step_time"], 2.0)  # 最多 2 秒
+
+            actual_interval = base_interval / speed
+            await asyncio.sleep(actual_interval)
+
+        # 回放完成
+        logger.info(f"[Playback] Completed playback for {job_id}")
+        await websocket.send_json({
+            "type": "playback_complete",
+            "total_metrics": total_metrics,
+        })
+
+    except WebSocketDisconnect:
+        logger.info(f"[Playback] Client disconnected during playback: {job_id}")
+    except Exception as e:
+        logger.error(f"[Playback] Error during playback: {e}")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "message": str(e)
+            })
+        except:
+            pass
+
+
 @router.get("/dashboard")
 async def get_dashboard_summary() -> Dict[str, Any]:
     """
@@ -1089,4 +1572,171 @@ async def get_dashboard_summary() -> Dict[str, Any]:
         "total_training_tokens": total_training_tokens,
         "recent_alerts": recent_alerts,
         "top_performing_experiments": top_performing_experiments,
+    }
+
+
+# ============== Phase 1.4: Diagnostics API ==============
+
+@router.post("/{job_id}/diagnose")
+async def diagnose_job(
+    job_id: str,
+    auto_mark_failed: bool = Query(True, description="Auto-mark job as failed if critical anomaly detected"),
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    诊断单个任务（Phase 1.4）
+
+    执行所有异常检测并返回诊断结果。
+
+    检测项：
+    - NaN/Inf 检测
+    - KL 散度爆炸
+    - Loss 不下降
+    - Reward 崩溃
+
+    如果检测到严重异常（CRITICAL），且 auto_mark_failed=True，
+    会自动将任务标记为失败。
+
+    使用场景：
+    - 手动诊断：用户点击"诊断"按钮
+    - 自动诊断：定时任务定期调用
+    """
+    from ...core.diagnostics import DiagnosticService
+    from ...core.database import JobRepository
+
+    job_repo = JobRepository(session)
+    job = job_repo.get_by_uuid(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    service = DiagnosticService(session)
+    result = service.diagnose_job(job_id, auto_mark_failed=auto_mark_failed)
+
+    return result
+
+
+@router.get("/{job_id}/anomalies/detected")
+async def get_detected_anomalies(
+    job_id: str,
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    获取检测到的异常（Phase 1.4）
+
+    返回当前检测到的所有异常，但不执行自动操作。
+
+    与 /diagnose 的区别：
+    - /diagnose: 执行检测并可能自动标记失败
+    - /anomalies/detected: 仅返回检测结果，不执行操作
+    """
+    from ...core.diagnostics import AnomalyDetector
+
+    detector = AnomalyDetector(session)
+    anomalies = detector.detect_all(job_id)
+
+    return {
+        "job_id": job_id,
+        "anomalies_count": len(anomalies),
+        "anomalies": [a.to_dict() for a in anomalies],
+    }
+
+
+@router.post("/diagnose-all")
+async def diagnose_all_running_jobs(
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    诊断所有运行中的任务（Phase 1.4）
+
+    定期调用此接口（如每分钟一次）实现自动监控。
+
+    工作流程：
+    1. 查询所有运行中的任务
+    2. 对每个任务执行异常检测
+    3. 检测到严重异常时自动标记失败
+    4. 返回诊断汇总
+
+    使用场景：
+    - 定时任务：cron job 每分钟调用
+    - 手动触发：管理员手动执行全局诊断
+    """
+    from ...core.diagnostics import DiagnosticService
+
+    service = DiagnosticService(session)
+    result = service.diagnose_all_running_jobs()
+
+    return result
+
+
+@router.get("/{job_id}/health")
+async def get_job_health_status(
+    job_id: str,
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    获取任务健康状态（Phase 1.4）
+
+    返回任务的整体健康评分和建议。
+
+    健康评分：
+    - 100: 完全健康，无异常
+    - 80-99: 有轻微警告
+    - 50-79: 有中等问题
+    - 0-49: 有严重问题
+
+    返回内容：
+    - health_score: 健康评分 (0-100)
+    - status: healthy, warning, critical
+    - anomalies: 检测到的异常列表
+    - suggestions: 诊断建议
+    """
+    from ...core.diagnostics import AnomalyDetector, AnomalySeverity
+    from ...core.database import JobRepository
+
+    job_repo = JobRepository(session)
+    job = job_repo.get_by_uuid(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    detector = AnomalyDetector(session)
+    anomalies = detector.detect_all(job_id)
+
+    # 计算健康评分
+    health_score = 100
+    for anomaly in anomalies:
+        if anomaly.severity == AnomalySeverity.CRITICAL:
+            health_score -= 50
+        elif anomaly.severity == AnomalySeverity.HIGH:
+            health_score -= 30
+        elif anomaly.severity == AnomalySeverity.MEDIUM:
+            health_score -= 15
+        elif anomaly.severity == AnomalySeverity.LOW:
+            health_score -= 5
+
+    health_score = max(0, health_score)
+
+    # 判断状态
+    if health_score >= 80:
+        status = "healthy"
+    elif health_score >= 50:
+        status = "warning"
+    else:
+        status = "critical"
+
+    # 收集建议
+    suggestions = []
+    for anomaly in anomalies:
+        if anomaly.suggestion:
+            suggestions.append(anomaly.suggestion)
+
+    return {
+        "job_id": job_id,
+        "job_status": job.status.value,
+        "health_score": health_score,
+        "health_status": status,
+        "anomalies_count": len(anomalies),
+        "anomalies": [a.to_dict() for a in anomalies],
+        "suggestions": suggestions,
     }
