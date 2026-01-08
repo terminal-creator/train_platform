@@ -1,0 +1,144 @@
+version: '3.8'
+
+# Celery Worker 架构配置
+#
+# 架构设计：
+# 1. Long-running Worker (training): 专门处理训练任务，单并发避免 GPU 竞争
+# 2. Short-lived Worker (other): 处理快速任务（评测、预处理、维护），高并发
+# 3. Beat Scheduler: 独立进程，负责周期任务调度
+#
+# 这样设计避免了：
+# - 长训练任务阻塞短任务（队列隔离）
+# - GPU 资源竞争（training worker 单并发）
+# - Beat 被阻塞（独立进程）
+
+services:
+  # Redis (消息队列 + 结果后端)
+  redis:
+    image: redis:7-alpine
+    container_name: training_platform_redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # PostgreSQL (状态持久化)
+  postgres:
+    image: postgres:15-alpine
+    container_name: training_platform_db
+    environment:
+      POSTGRES_USER: training_platform
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: training_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U training_platform"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ============== Celery Workers ==============
+
+  # Long-running Worker: 专门处理训练任务
+  celery_worker_training:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker_training
+    command: celery -A training_platform.core.celery_config worker -Q training -c 1 -l info --max-tasks-per-child 1
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://training_platform:changeme@postgres:5432/training_platform
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./training_platform:/app/training_platform
+      - training_outputs:/app/outputs
+      - model_cache:/root/.cache/huggingface
+    restart: unless-stopped
+    # 如果有 GPU，取消注释
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Short-lived Worker: 处理快速任务
+  celery_worker_short:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker_short
+    command: celery -A training_platform.core.celery_config worker -Q default,evaluation,preprocessing,maintenance -c 4 -l info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://training_platform:changeme@postgres:5432/training_platform
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./training_platform:/app/training_platform
+      - training_outputs:/app/outputs
+    restart: unless-stopped
+
+  # Beat Scheduler: 周期任务调度
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_beat
+    command: celery -A training_platform.core.celery_config beat -l info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://training_platform:changeme@postgres:5432/training_platform
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./training_platform:/app/training_platform
+    restart: unless-stopped
+
+  # Flower: Celery 监控面板 (可选)
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_flower
+    command: celery -A training_platform.core.celery_config flower --port=5555
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+  training_outputs:
+  model_cache:

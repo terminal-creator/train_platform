@@ -8,19 +8,25 @@ import {
   PlayCircle,
   GitMerge,
   Activity,
-  ClipboardCheck
+  ClipboardCheck,
+  Settings,
+  Workflow,
+  ListChecks
 } from 'lucide-vue-next'
 
 const route = useRoute()
 
 const navItems = [
-  { path: '/', name: '仪表盘', icon: LayoutDashboard },
-  { path: '/compute', name: '计算配置器', icon: Calculator },
-  { path: '/datasets', name: '数据集', icon: Database },
-  { path: '/jobs', name: '训练任务', icon: PlayCircle },
-  { path: '/surgery', name: '模型手术', icon: GitMerge },
-  { path: '/monitoring', name: '实时监控', icon: Activity },
-  { path: '/evaluation', name: '自定义评估', icon: ClipboardCheck },
+  { path: '/settings', name: '1. 设置', icon: Settings },
+  { path: '/datasets', name: '2. 数据集', icon: Database },
+  { path: '/compute', name: '3. 计算配置', icon: Calculator },
+  { path: '/jobs', name: '4. 训练任务', icon: PlayCircle },
+  { path: '/pipelines', name: '5. Pipeline 管理', icon: Workflow },
+  { path: '/tasks', name: '6. 任务监控', icon: ListChecks },
+  { path: '/monitoring', name: '7. 实时监控', icon: Activity },
+  { path: '/evaluation', name: '8. 自定义评估', icon: ClipboardCheck },
+  { path: '/surgery', name: '9. 模型手术', icon: GitMerge },
+  { path: '/', name: '10. 仪表盘', icon: LayoutDashboard },
 ]
 </script>
 

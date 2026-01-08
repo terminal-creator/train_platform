@@ -38,6 +38,7 @@ export const getJob = (id) => api.get(`/jobs/${id}`)
 export const createJob = (data) => api.post('/jobs', data)
 export const getAvailableModels = () => api.get('/jobs/available-models')
 export const getAvailableDatasets = () => api.get('/jobs/available-datasets')
+export const getAvailableRewardScripts = () => api.get('/jobs/available-reward-scripts')
 export const getDatasetPreview = (path) => api.post('/jobs/dataset-preview', { path })
 export const updateJob = (id, data) => api.patch(`/jobs/${id}`, data)
 export const deleteJob = (id) => api.delete(`/jobs/${id}`)
@@ -67,6 +68,12 @@ export const getGpuUsage = (jobId) => api.get(`/monitoring/${jobId}/gpu-usage`)
 export const getAlerts = (jobId, params) => api.get(`/monitoring/${jobId}/alerts`, { params })
 export const setAlertRules = (jobId, rules) => api.post(`/monitoring/${jobId}/alert-rules`, rules)
 export const acknowledgeAlert = (jobId, alertId) => api.post(`/monitoring/${jobId}/alerts/${alertId}/acknowledge`)
+
+// Phase 1 - Diagnostics and Anomaly Detection
+export const getJobAnomalies = (jobId) => api.get(`/monitoring/${jobId}/anomalies/detected`)
+export const getJobHealth = (jobId) => api.get(`/monitoring/${jobId}/health`)
+export const diagnoseJob = (jobId) => api.post(`/monitoring/${jobId}/diagnose`)
+export const syncJobMetrics = (jobId) => api.post(`/monitoring/${jobId}/metrics/sync`)
 
 // Evaluation
 export const getEvalDatasets = (params) => api.get('/evaluation/datasets', { params })
@@ -118,6 +125,21 @@ export const configureTrainingDatasetLoss = (uuid, promptField, responseField) =
   api.post(`/training-datasets/${uuid}/configure-loss`, { prompt_field: promptField, response_field: responseField })
 export const reanalyzeTrainingDataset = (uuid, autoDetect = false) =>
   api.post(`/training-datasets/${uuid}/reanalyze`, null, { params: { auto_detect_labels: autoDetect } })
+export const syncTrainingDataset = (uuid, force = false) =>
+  api.post(`/training-datasets/${uuid}/sync`, null, { params: { force } })
+export const syncAllTrainingDatasets = (force = false) =>
+  api.post('/training-datasets/sync-all', null, { params: { force } })
+
+// Run Mode Configuration
+export const getRunModeConfig = () => api.get('/run-mode/config')
+export const setRunModeConfig = (data) => api.post('/run-mode/config', data)
+export const testConnection = () => api.post('/run-mode/test-connection')
+export const testSSHConnection = (config) => api.post('/run-mode/test-ssh', config)
+export const getGpuInfo = () => api.get('/run-mode/gpu-info')
+export const getSSHGpuInfo = (config) => api.post('/run-mode/ssh/gpu-info', config)
+export const getRunnerStatus = () => api.get('/run-mode/status')
+export const getRemoteModels = () => api.get('/run-mode/remote/models')
+export const getRemoteDatasets = () => api.get('/run-mode/remote/datasets')
 
 // WebSocket for live metrics
 export const createMetricsWebSocket = (jobId) => {

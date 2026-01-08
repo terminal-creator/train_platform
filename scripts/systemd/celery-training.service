@@ -1,0 +1,39 @@
+[Unit]
+Description=Celery Worker (Training Queue)
+After=network.target redis.service
+
+[Service]
+Type=forking
+User=training
+Group=training
+WorkingDirectory=/opt/training_platform
+
+# Environment
+Environment=REDIS_URL=redis://localhost:6381/0
+Environment=DATABASE_URL=postgresql://training_platform:password@localhost:5432/training_platform
+Environment=PYTHONPATH=/opt/training_platform
+
+# Command
+ExecStart=/opt/training_platform/venv/bin/celery \
+    -A training_platform.core.celery_config worker \
+    -Q training \
+    -c 1 \
+    -l info \
+    --max-tasks-per-child 1 \
+    -n training@%h \
+    --pidfile=/var/run/celery/training.pid \
+    --logfile=/var/log/celery/training.log
+
+# PID file
+PIDFile=/var/run/celery/training.pid
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Resource limits (optional)
+# LimitNOFILE=65536
+# MemoryLimit=16G
+
+[Install]
+WantedBy=multi-user.target

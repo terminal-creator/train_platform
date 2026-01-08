@@ -1,0 +1,50 @@
+[
+  {
+    "prompt": "请简要介绍人工智能的发展历史。",
+    "data_source": "general"
+  },
+  {
+    "prompt": "Python和Java的主要区别是什么？",
+    "data_source": "coding"
+  },
+  {
+    "prompt": "如何保持良好的睡眠习惯？",
+    "data_source": "health"
+  },
+  {
+    "prompt": "请解释什么是机器学习？",
+    "data_source": "general"
+  },
+  {
+    "prompt": "写一首关于春天的短诗。",
+    "data_source": "creative"
+  },
+  {
+    "prompt": "如何提高英语口语能力？",
+    "data_source": "education"
+  },
+  {
+    "prompt": "解释HTTP和HTTPS的区别。",
+    "data_source": "coding"
+  },
+  {
+    "prompt": "推荐三本值得阅读的书籍。",
+    "data_source": "general"
+  },
+  {
+    "prompt": "如何管理工作压力？",
+    "data_source": "health"
+  },
+  {
+    "prompt": "什么是深度学习？它与机器学习有什么关系？",
+    "data_source": "general"
+  },
+  {
+    "prompt": "请用简单的语言解释量子计算。",
+    "data_source": "science"
+  },
+  {
+    "prompt": "如何开始学习编程？",
+    "data_source": "education"
+  }
+]

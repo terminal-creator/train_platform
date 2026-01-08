@@ -7,6 +7,8 @@ from .websocket import router as websocket_router
 from .dataset import router as dataset_router
 from .evaluation import router as evaluation_router
 from .training_dataset import router as training_dataset_router
+from .run_mode import router as run_mode_router
+from .recipes import router as recipes_router
 
 __all__ = [
     "compute_router",
@@ -17,4 +19,6 @@ __all__ = [
     "dataset_router",
     "evaluation_router",
     "training_dataset_router",
+    "run_mode_router",
+    "recipes_router",
 ]

@@ -1,0 +1,50 @@
+[
+  {
+    "prompt": "计算: 23 + 45 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 9 × 8 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 150 - 89 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 72 ÷ 8 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 17 × 6 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 88 + 22 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 256 - 128 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 49 ÷ 7 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "解方程: x - 8 = 15, x = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "解方程: 3x = 27, x = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: (10 - 3) × 5 = ?",
+    "data_source": "math"
+  },
+  {
+    "prompt": "计算: 100 ÷ (4 + 1) = ?",
+    "data_source": "math"
+  }
+]

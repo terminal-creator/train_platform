@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJobsStore } from '@/stores/jobs'
 import { useComputeStore } from '@/stores/compute'
@@ -13,12 +13,29 @@ import {
   Trash2,
   Inbox,
   FolderOpen,
-  Pencil
+  Pencil,
+  Monitor,
+  Server,
+  RefreshCw,
+  Settings
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const jobsStore = useJobsStore()
 const computeStore = useComputeStore()
+
+// Run mode switch handler
+const handleModeSwitch = async (mode) => {
+  await jobsStore.switchRunMode(mode)
+}
+
+// Refresh models and datasets
+const refreshResources = async () => {
+  await Promise.all([
+    jobsStore.fetchAvailableModels(),
+    jobsStore.fetchAvailableDatasets()
+  ])
+}
 
 const filter = ref('all')
 const showNewJobModal = ref(false)
@@ -37,6 +54,9 @@ const filters = [
   { key: 'pending', label: '待处理' }
 ]
 
+// Unified reward script mode
+const useUnifiedRewardScript = ref(false)
+
 const newJob = ref({
   name: '',
   algorithm: 'grpo',
@@ -50,8 +70,41 @@ const newJob = ref({
   context_length: 4096,
   lora_enabled: false,
   lora_rank: 8,
-  description: ''
+  description: '',
+  // GRPO reward function config (legacy)
+  reward_fn_type: 'math_verify',
+  reward_fn_extract_answer: 'boxed',
+  reward_fn_compare_method: 'exact',
+  reward_fn_answer_key: 'solution',
+  reward_fn_custom_path: '',
+  // PPO reward model config (legacy)
+  reward_model_path: '',
+  reward_model_enable_gc: true,
+  reward_model_offload: false,
+  reward_model_micro_batch: 4,
+  // Unified reward script config
+  reward_script_path: '',
+  reward_script_type: 'rule',
+  reward_script_metadata: {}
 })
+
+const rewardFnTypes = [
+  { value: 'math_verify', label: '数学验证', desc: '验证数学答案正确性' },
+  { value: 'format_check', label: '格式检查', desc: '检查输出格式规范' },
+  { value: 'custom', label: '自定义函数', desc: '使用自定义Python脚本' }
+]
+
+const extractAnswerMethods = [
+  { value: 'boxed', label: '\\boxed{}', desc: '从LaTeX盒子提取' },
+  { value: 'last_number', label: '最后数字', desc: '提取最后出现的数字' },
+  { value: 'json', label: 'JSON字段', desc: '从JSON响应提取' }
+]
+
+const compareMethods = [
+  { value: 'exact', label: '精确匹配', desc: '字符串完全相等' },
+  { value: 'numeric', label: '数值比较', desc: '数值相等（忽略格式）' },
+  { value: 'fuzzy', label: '模糊匹配', desc: '允许小误差' }
+]
 
 const algorithms = [
   { value: 'grpo', label: 'GRPO' },
@@ -122,10 +175,26 @@ const resetNewJob = () => {
     context_length: 4096,
     lora_enabled: false,
     lora_rank: 8,
-    description: ''
+    description: '',
+    // GRPO reward function (legacy)
+    reward_fn_type: 'math_verify',
+    reward_fn_extract_answer: 'boxed',
+    reward_fn_compare_method: 'exact',
+    reward_fn_answer_key: 'solution',
+    reward_fn_custom_path: '',
+    // PPO reward model (legacy)
+    reward_model_path: '',
+    reward_model_enable_gc: true,
+    reward_model_offload: false,
+    reward_model_micro_batch: 4,
+    // Unified reward script
+    reward_script_path: '',
+    reward_script_type: 'rule',
+    reward_script_metadata: {}
   }
   useCustomModelPath.value = false
   useCustomDatasetPath.value = false
+  useUnifiedRewardScript.value = false
 }
 
 const createJob = async () => {
@@ -199,17 +268,92 @@ const viewJob = (job) => {
 }
 
 onMounted(async () => {
+  // First fetch run mode config to know which source to use
+  await jobsStore.fetchRunModeConfig()
+
+  // Then fetch everything else
   await Promise.all([
     jobsStore.fetchJobs(),
     computeStore.fetchGpuTypes(),
     jobsStore.fetchAvailableModels(),
-    jobsStore.fetchAvailableDatasets()
+    jobsStore.fetchAvailableDatasets(),
+    jobsStore.fetchAvailableRewardScripts()
   ])
 })
 </script>
 
 <template>
   <div>
+    <!-- Run Mode Switch -->
+    <div class="glass-card rounded-lg p-3 mb-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <span class="text-xs text-gray-500">运行模式:</span>
+          <div class="flex bg-gray-100 rounded-lg p-0.5">
+            <button
+              @click="handleModeSwitch('local')"
+              :disabled="jobsStore.runModeLoading"
+              :class="[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all',
+                jobsStore.runMode === 'local'
+                  ? 'bg-white shadow text-gray-800 font-medium'
+                  : 'text-gray-500 hover:text-gray-700'
+              ]"
+            >
+              <Monitor class="w-3.5 h-3.5" />
+              本地
+            </button>
+            <button
+              @click="handleModeSwitch('ssh')"
+              :disabled="jobsStore.runModeLoading || !jobsStore.runModeConfig?.ssh_configured"
+              :class="[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-all',
+                jobsStore.runMode === 'ssh'
+                  ? 'bg-white shadow text-gray-800 font-medium'
+                  : 'text-gray-500 hover:text-gray-700',
+                !jobsStore.runModeConfig?.ssh_configured && 'opacity-50 cursor-not-allowed'
+              ]"
+              :title="!jobsStore.runModeConfig?.ssh_configured ? '请先在设置页面配置SSH' : ''"
+            >
+              <Server class="w-3.5 h-3.5" />
+              SSH远程
+            </button>
+          </div>
+          <RefreshCw
+            v-if="jobsStore.runModeLoading"
+            class="w-4 h-4 text-gray-400 animate-spin"
+          />
+        </div>
+
+        <div class="flex items-center gap-3">
+          <!-- Current mode info -->
+          <div v-if="jobsStore.runMode === 'ssh'" class="flex items-center gap-2 text-xs">
+            <span class="px-2 py-0.5 rounded bg-green-100 text-green-700">
+              {{ jobsStore.runModeConfig?.ssh_host }}
+            </span>
+          </div>
+
+          <!-- Refresh button -->
+          <button
+            @click="refreshResources"
+            class="p-1.5 rounded-md hover:bg-gray-100"
+            title="刷新模型和数据集列表"
+          >
+            <RefreshCw class="w-4 h-4 text-gray-500" />
+          </button>
+
+          <!-- Settings link -->
+          <router-link
+            to="/settings"
+            class="p-1.5 rounded-md hover:bg-gray-100"
+            title="SSH设置"
+          >
+            <Settings class="w-4 h-4 text-gray-500" />
+          </router-link>
+        </div>
+      </div>
+    </div>
+
     <!-- Header -->
     <div class="flex justify-between items-center mb-4">
       <div class="flex gap-1.5">
@@ -474,6 +618,208 @@ onMounted(async () => {
             placeholder="Rank"
             class="w-20 input-light !px-2 !py-1.5 text-xs"
           >
+        </div>
+
+        <!-- GRPO Reward Function Configuration -->
+        <div v-if="newJob.algorithm === 'grpo'" class="border border-blue-200 rounded-lg p-3 bg-blue-50/50">
+          <h5 class="text-xs font-medium text-blue-700 mb-3 flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded bg-blue-500 text-white flex items-center justify-center text-2xs">f</span>
+            奖励函数配置 (GRPO)
+          </h5>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">函数类型</label>
+              <select v-model="newJob.reward_fn_type" class="w-full input-light text-xs">
+                <option v-for="fn in rewardFnTypes" :key="fn.value" :value="fn.value">
+                  {{ fn.label }} - {{ fn.desc }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">答案字段</label>
+              <input
+                type="text"
+                v-model="newJob.reward_fn_answer_key"
+                placeholder="solution"
+                class="w-full input-light text-xs"
+              >
+            </div>
+          </div>
+          <div v-if="newJob.reward_fn_type === 'math_verify'" class="grid grid-cols-2 gap-3 mt-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">答案提取方式</label>
+              <select v-model="newJob.reward_fn_extract_answer" class="w-full input-light text-xs">
+                <option v-for="m in extractAnswerMethods" :key="m.value" :value="m.value">
+                  {{ m.label }} - {{ m.desc }}
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">比较方法</label>
+              <select v-model="newJob.reward_fn_compare_method" class="w-full input-light text-xs">
+                <option v-for="m in compareMethods" :key="m.value" :value="m.value">
+                  {{ m.label }} - {{ m.desc }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div v-if="newJob.reward_fn_type === 'custom'" class="mt-3">
+            <label class="block text-xs text-gray-500 mb-1.5">自定义函数路径</label>
+            <input
+              type="text"
+              v-model="newJob.reward_fn_custom_path"
+              placeholder="/path/to/reward_fn.py"
+              class="w-full input-light text-xs"
+            >
+            <p class="text-2xs text-gray-400 mt-1">Python脚本需实现 reward_fn(prompt, response, solution) -> float</p>
+          </div>
+        </div>
+
+        <!-- PPO Reward Model Configuration (Legacy) -->
+        <div v-if="newJob.algorithm === 'ppo' && !useUnifiedRewardScript" class="border border-purple-200 rounded-lg p-3 bg-purple-50/50">
+          <div class="flex items-center justify-between mb-3">
+            <h5 class="text-xs font-medium text-purple-700 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded bg-purple-500 text-white flex items-center justify-center text-2xs">M</span>
+              奖励模型配置 (PPO)
+            </h5>
+            <button
+              type="button"
+              @click="useUnifiedRewardScript = true"
+              class="text-2xs text-purple-500 hover:underline"
+            >
+              使用奖励脚本
+            </button>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1.5">奖励模型路径 *</label>
+            <input
+              type="text"
+              v-model="newJob.reward_model_path"
+              placeholder="/path/to/reward_model"
+              class="w-full input-light text-xs"
+            >
+            <p class="text-2xs text-gray-400 mt-1">需要预训练的奖励模型来评估回答质量</p>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mt-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">Micro Batch</label>
+              <input
+                type="number"
+                v-model.number="newJob.reward_model_micro_batch"
+                min="1"
+                class="w-full input-light text-xs"
+              >
+            </div>
+            <div class="flex items-center">
+              <label class="flex items-center gap-2 cursor-pointer mt-4">
+                <input type="checkbox" v-model="newJob.reward_model_enable_gc" class="w-3.5 h-3.5 accent-purple-500">
+                <span class="text-xs text-gray-700">梯度检查点</span>
+              </label>
+            </div>
+            <div class="flex items-center">
+              <label class="flex items-center gap-2 cursor-pointer mt-4">
+                <input type="checkbox" v-model="newJob.reward_model_offload" class="w-3.5 h-3.5 accent-purple-500">
+                <span class="text-xs text-gray-700">参数卸载</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unified Reward Script Configuration (for PPO/GRPO/GSPO) -->
+        <div v-if="['ppo', 'grpo', 'gspo'].includes(newJob.algorithm) && useUnifiedRewardScript" class="border border-green-200 rounded-lg p-3 bg-green-50/50">
+          <div class="flex items-center justify-between mb-3">
+            <h5 class="text-xs font-medium text-green-700 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded bg-green-500 text-white flex items-center justify-center text-2xs">S</span>
+              奖励脚本配置
+            </h5>
+            <button
+              type="button"
+              @click="useUnifiedRewardScript = false"
+              class="text-2xs text-green-500 hover:underline"
+            >
+              使用{{ newJob.algorithm === 'ppo' ? '奖励模型' : '内置函数' }}
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">选择脚本</label>
+              <select v-model="newJob.reward_script_path" class="w-full input-light text-xs">
+                <option value="">请选择脚本...</option>
+                <option v-for="script in jobsStore.availableRewardScripts" :key="script.path" :value="script.path">
+                  {{ script.name }} ({{ script.type }})
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">脚本类型</label>
+              <select v-model="newJob.reward_script_type" class="w-full input-light text-xs">
+                <option value="rule">规则函数 (Rule)</option>
+                <option value="api">API调用 (API)</option>
+                <option value="model">本地模型 (Model)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Show selected script info -->
+          <div v-if="newJob.reward_script_path" class="mt-3 p-2 bg-white rounded border border-green-100">
+            <p class="text-xs text-gray-600">
+              {{ jobsStore.availableRewardScripts.find(s => s.path === newJob.reward_script_path)?.description || '无描述' }}
+            </p>
+          </div>
+
+          <!-- Script-specific metadata configuration -->
+          <div v-if="newJob.reward_script_type === 'api'" class="mt-3">
+            <label class="block text-xs text-gray-500 mb-1.5">API 配置 (JSON)</label>
+            <textarea
+              v-model="newJob.reward_script_metadata.api_config"
+              rows="2"
+              placeholder='{"api_type": "openai", "model": "gpt-4"}'
+              class="w-full input-light text-xs font-mono"
+            />
+          </div>
+
+          <div v-if="newJob.reward_script_type === 'model'" class="mt-3">
+            <label class="block text-xs text-gray-500 mb-1.5">模型路径</label>
+            <input
+              type="text"
+              v-model="newJob.reward_script_metadata.model_path"
+              placeholder="/path/to/reward_model"
+              class="w-full input-light text-xs"
+            >
+          </div>
+
+          <p class="text-2xs text-gray-400 mt-3">
+            奖励脚本需实现标准接口: stdin(JSON) → stdout(JSON) —
+            <a href="https://github.com/..." target="_blank" class="text-green-500 hover:underline">查看文档</a>
+          </p>
+        </div>
+
+        <!-- Toggle to use unified script for GRPO -->
+        <div v-if="newJob.algorithm === 'grpo' && !useUnifiedRewardScript" class="text-right">
+          <button
+            type="button"
+            @click="useUnifiedRewardScript = true"
+            class="text-2xs text-green-500 hover:underline"
+          >
+            切换到奖励脚本模式
+          </button>
+        </div>
+
+        <!-- Toggle for GSPO (always uses unified script) -->
+        <div v-if="newJob.algorithm === 'gspo' && !useUnifiedRewardScript" class="border border-green-200 rounded-lg p-3 bg-green-50/50">
+          <h5 class="text-xs font-medium text-green-700 mb-3 flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded bg-green-500 text-white flex items-center justify-center text-2xs">S</span>
+            奖励配置 (GSPO)
+          </h5>
+          <p class="text-xs text-gray-500 mb-3">GSPO 需要配置奖励脚本来评估生成结果</p>
+          <button
+            type="button"
+            @click="useUnifiedRewardScript = true"
+            class="btn-secondary text-xs"
+          >
+            配置奖励脚本
+          </button>
         </div>
 
         <div>

@@ -24,7 +24,10 @@ from ...core.database import (
     get_session,
     TrainingDataset,
     TrainingDatasetRepository,
+    DatasetSyncStatus,
 )
+from ...core.ssh_runner import get_dataset_sync_service
+from ...core.run_mode import load_run_mode_config, RunMode
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,12 @@ class TrainingDatasetResponse(BaseModel):
     field_distributions: Dict[str, Any]
     prompt_field: str
     response_field: str
+    # Remote sync info
+    remote_path: Optional[str] = None
+    sync_status: str = "not_synced"
+    sync_error: Optional[str] = None
+    synced_at: Optional[datetime] = None
+    # Timestamps
     created_at: datetime
     analyzed_at: Optional[datetime] = None
 
@@ -194,6 +203,79 @@ def load_dataset_records(file_path: str, file_format: str) -> List[Dict]:
     return records
 
 
+def _build_dataset_response(dataset: TrainingDataset) -> TrainingDatasetResponse:
+    """Build TrainingDatasetResponse from TrainingDataset model."""
+    return TrainingDatasetResponse(
+        uuid=dataset.uuid,
+        name=dataset.name,
+        description=dataset.description,
+        file_path=dataset.file_path,
+        file_format=dataset.file_format,
+        file_size_mb=dataset.file_size_mb,
+        total_rows=dataset.total_rows,
+        columns=dataset.columns,
+        label_fields=dataset.label_fields,
+        field_distributions=dataset.field_distributions,
+        prompt_field=dataset.prompt_field,
+        response_field=dataset.response_field,
+        remote_path=dataset.remote_path,
+        sync_status=dataset.sync_status.value if dataset.sync_status else "not_synced",
+        sync_error=dataset.sync_error,
+        synced_at=dataset.synced_at,
+        created_at=dataset.created_at,
+        analyzed_at=dataset.analyzed_at,
+    )
+
+
+def _sync_dataset_to_remote(dataset: TrainingDataset, repo: TrainingDatasetRepository) -> TrainingDataset:
+    """
+    Sync dataset to remote server if SSH mode is configured.
+    Updates dataset with sync status.
+    """
+    config = load_run_mode_config()
+    if config.mode != RunMode.SSH:
+        # Not in SSH mode, skip sync
+        return dataset
+
+    sync_service = get_dataset_sync_service()
+    if not sync_service:
+        dataset.sync_status = DatasetSyncStatus.FAILED
+        dataset.sync_error = "SSH not configured properly"
+        return repo.update(dataset)
+
+    # Update status to syncing
+    dataset.sync_status = DatasetSyncStatus.SYNCING
+    dataset.sync_error = None
+    repo.update(dataset)
+
+    try:
+        result = sync_service.sync_dataset(
+            local_path=dataset.file_path,
+            dataset_name=dataset.name,
+            dataset_uuid=dataset.uuid,
+        )
+
+        if result.get("success"):
+            dataset.remote_path = result.get("remote_path")
+            dataset.sync_status = DatasetSyncStatus.SYNCED
+            dataset.sync_error = None
+            dataset.synced_at = datetime.utcnow()
+            logger.info(f"Dataset {dataset.uuid} synced to {dataset.remote_path}")
+        else:
+            dataset.sync_status = DatasetSyncStatus.FAILED
+            dataset.sync_error = result.get("error", "Unknown error")
+            logger.error(f"Dataset {dataset.uuid} sync failed: {dataset.sync_error}")
+
+    except Exception as e:
+        dataset.sync_status = DatasetSyncStatus.FAILED
+        dataset.sync_error = str(e)
+        logger.error(f"Dataset {dataset.uuid} sync exception: {e}")
+    finally:
+        sync_service.disconnect()
+
+    return repo.update(dataset)
+
+
 # ============== API Endpoints ==============
 
 @router.post("/upload", response_model=TrainingDatasetResponse)
@@ -277,22 +359,10 @@ async def upload_training_dataset(
         repo = TrainingDatasetRepository(session)
         dataset = repo.create(dataset)
 
-        return TrainingDatasetResponse(
-            uuid=dataset.uuid,
-            name=dataset.name,
-            description=dataset.description,
-            file_path=dataset.file_path,
-            file_format=dataset.file_format,
-            file_size_mb=dataset.file_size_mb,
-            total_rows=dataset.total_rows,
-            columns=dataset.columns,
-            label_fields=dataset.label_fields,
-            field_distributions=dataset.field_distributions,
-            prompt_field=dataset.prompt_field,
-            response_field=dataset.response_field,
-            created_at=dataset.created_at,
-            analyzed_at=dataset.analyzed_at,
-        )
+        # Auto-sync to remote server if SSH mode is configured
+        dataset = _sync_dataset_to_remote(dataset, repo)
+
+        return _build_dataset_response(dataset)
 
     except HTTPException:
         raise
@@ -314,25 +384,7 @@ async def list_training_datasets(
     repo = TrainingDatasetRepository(session)
     datasets, total = repo.list_datasets(offset=offset, limit=limit)
 
-    return [
-        TrainingDatasetResponse(
-            uuid=d.uuid,
-            name=d.name,
-            description=d.description,
-            file_path=d.file_path,
-            file_format=d.file_format,
-            file_size_mb=d.file_size_mb,
-            total_rows=d.total_rows,
-            columns=d.columns,
-            label_fields=d.label_fields,
-            field_distributions=d.field_distributions,
-            prompt_field=d.prompt_field,
-            response_field=d.response_field,
-            created_at=d.created_at,
-            analyzed_at=d.analyzed_at,
-        )
-        for d in datasets
-    ]
+    return [_build_dataset_response(d) for d in datasets]
 
 
 @router.get("/{uuid}", response_model=TrainingDatasetResponse)
@@ -347,22 +399,7 @@ async def get_training_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    return TrainingDatasetResponse(
-        uuid=dataset.uuid,
-        name=dataset.name,
-        description=dataset.description,
-        file_path=dataset.file_path,
-        file_format=dataset.file_format,
-        file_size_mb=dataset.file_size_mb,
-        total_rows=dataset.total_rows,
-        columns=dataset.columns,
-        label_fields=dataset.label_fields,
-        field_distributions=dataset.field_distributions,
-        prompt_field=dataset.prompt_field,
-        response_field=dataset.response_field,
-        created_at=dataset.created_at,
-        analyzed_at=dataset.analyzed_at,
-    )
+    return _build_dataset_response(dataset)
 
 
 @router.delete("/{uuid}")
@@ -377,9 +414,19 @@ async def delete_training_dataset(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    # Delete file
+    # Delete local file
     if os.path.exists(dataset.file_path):
         os.remove(dataset.file_path)
+
+    # Delete remote file if synced
+    if dataset.remote_path and dataset.sync_status == DatasetSyncStatus.SYNCED:
+        try:
+            sync_service = get_dataset_sync_service()
+            if sync_service:
+                sync_service.delete_remote_dataset(dataset.remote_path)
+                sync_service.disconnect()
+        except Exception as e:
+            logger.warning(f"Failed to delete remote file: {e}")
 
     # Delete from database
     repo.delete(uuid)
@@ -581,22 +628,7 @@ async def configure_label_fields(
 
     dataset = repo.update(dataset)
 
-    return TrainingDatasetResponse(
-        uuid=dataset.uuid,
-        name=dataset.name,
-        description=dataset.description,
-        file_path=dataset.file_path,
-        file_format=dataset.file_format,
-        file_size_mb=dataset.file_size_mb,
-        total_rows=dataset.total_rows,
-        columns=dataset.columns,
-        label_fields=dataset.label_fields,
-        field_distributions=dataset.field_distributions,
-        prompt_field=dataset.prompt_field,
-        response_field=dataset.response_field,
-        created_at=dataset.created_at,
-        analyzed_at=dataset.analyzed_at,
-    )
+    return _build_dataset_response(dataset)
 
 
 @router.post("/{uuid}/configure-loss", response_model=TrainingDatasetResponse)
@@ -624,22 +656,7 @@ async def configure_loss_fields(
 
     dataset = repo.update(dataset)
 
-    return TrainingDatasetResponse(
-        uuid=dataset.uuid,
-        name=dataset.name,
-        description=dataset.description,
-        file_path=dataset.file_path,
-        file_format=dataset.file_format,
-        file_size_mb=dataset.file_size_mb,
-        total_rows=dataset.total_rows,
-        columns=dataset.columns,
-        label_fields=dataset.label_fields,
-        field_distributions=dataset.field_distributions,
-        prompt_field=dataset.prompt_field,
-        response_field=dataset.response_field,
-        created_at=dataset.created_at,
-        analyzed_at=dataset.analyzed_at,
-    )
+    return _build_dataset_response(dataset)
 
 
 @router.post("/{uuid}/reanalyze", response_model=TrainingDatasetResponse)
@@ -672,19 +689,95 @@ async def reanalyze_dataset(
 
     dataset = repo.update(dataset)
 
-    return TrainingDatasetResponse(
-        uuid=dataset.uuid,
-        name=dataset.name,
-        description=dataset.description,
-        file_path=dataset.file_path,
-        file_format=dataset.file_format,
-        file_size_mb=dataset.file_size_mb,
-        total_rows=dataset.total_rows,
-        columns=dataset.columns,
-        label_fields=dataset.label_fields,
-        field_distributions=dataset.field_distributions,
-        prompt_field=dataset.prompt_field,
-        response_field=dataset.response_field,
-        created_at=dataset.created_at,
-        analyzed_at=dataset.analyzed_at,
-    )
+    return _build_dataset_response(dataset)
+
+
+@router.post("/{uuid}/sync", response_model=TrainingDatasetResponse)
+async def sync_dataset_to_remote(
+    uuid: str,
+    force: bool = Query(False, description="Force re-sync even if already synced"),
+    session: Session = Depends(get_session),
+):
+    """
+    Manually sync a dataset to the remote SSH server.
+
+    Use force=true to re-sync even if already synced.
+    Requires SSH mode to be configured in Settings.
+    """
+    repo = TrainingDatasetRepository(session)
+    dataset = repo.get_by_uuid(uuid)
+
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    # Check if SSH mode is configured
+    config = load_run_mode_config()
+    if config.mode != RunMode.SSH:
+        raise HTTPException(
+            status_code=400,
+            detail="SSH mode not configured. Go to Settings to configure SSH connection."
+        )
+
+    # Skip if already synced and not forcing
+    if dataset.sync_status == DatasetSyncStatus.SYNCED and not force:
+        return _build_dataset_response(dataset)
+
+    # Perform sync
+    dataset = _sync_dataset_to_remote(dataset, repo)
+
+    return _build_dataset_response(dataset)
+
+
+@router.post("/sync-all")
+async def sync_all_datasets(
+    force: bool = Query(False, description="Force re-sync all datasets"),
+    session: Session = Depends(get_session),
+):
+    """
+    Sync all datasets to the remote SSH server.
+
+    Useful after configuring SSH mode for the first time.
+    """
+    config = load_run_mode_config()
+    if config.mode != RunMode.SSH:
+        raise HTTPException(
+            status_code=400,
+            detail="SSH mode not configured. Go to Settings to configure SSH connection."
+        )
+
+    repo = TrainingDatasetRepository(session)
+    datasets, _ = repo.list_datasets(offset=0, limit=1000)
+
+    results = {
+        "total": len(datasets),
+        "synced": 0,
+        "skipped": 0,
+        "failed": 0,
+        "errors": [],
+    }
+
+    for dataset in datasets:
+        if dataset.sync_status == DatasetSyncStatus.SYNCED and not force:
+            results["skipped"] += 1
+            continue
+
+        try:
+            dataset = _sync_dataset_to_remote(dataset, repo)
+            if dataset.sync_status == DatasetSyncStatus.SYNCED:
+                results["synced"] += 1
+            else:
+                results["failed"] += 1
+                results["errors"].append({
+                    "uuid": dataset.uuid,
+                    "name": dataset.name,
+                    "error": dataset.sync_error,
+                })
+        except Exception as e:
+            results["failed"] += 1
+            results["errors"].append({
+                "uuid": dataset.uuid,
+                "name": dataset.name,
+                "error": str(e),
+            })
+
+    return results

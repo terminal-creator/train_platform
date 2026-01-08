@@ -18,6 +18,7 @@ import uuid
 import json
 import tempfile
 import asyncio
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,99 @@ router = APIRouter(prefix="/datasets", tags=["Datasets"])
 
 # Store for background deduplication tasks
 _dedup_tasks: Dict[str, Dict[str, Any]] = {}
+
+# Whitelist of allowed directories for file access
+# Configure via environment variable ALLOWED_DATASET_DIRS (comma-separated)
+_allowed_dirs_env = os.getenv(
+    "ALLOWED_DATASET_DIRS",
+    "~/train_platform/datasets,~/datasets,./datasets,./data"
+)
+ALLOWED_DATASET_DIRS = [
+    os.path.abspath(os.path.expanduser(d.strip()))
+    for d in _allowed_dirs_env.split(",")
+]
+
+
+def validate_file_path(file_path: str) -> str:
+    """
+    Validate that a file path is safe and within allowed directories.
+
+    This prevents Local File Inclusion (LFI) attacks by:
+    1. Resolving symlinks and relative paths
+    2. Checking against whitelist of allowed directories
+    3. Preventing directory traversal attacks (../)
+
+    **Important**: This function is pure validation - no side effects.
+    It does NOT create directories. Allowed directories should be
+    created at deployment time.
+
+    Args:
+        file_path: User-provided file path
+
+    Returns:
+        Absolute, validated file path
+
+    Raises:
+        HTTPException: If path is invalid or not allowed
+    """
+    try:
+        # Expand user home directory and resolve to absolute path
+        expanded_path = os.path.expanduser(file_path)
+
+        # Resolve symlinks and relative paths (prevents ../ attacks)
+        real_path = os.path.realpath(expanded_path)
+
+        # Check if path is within any allowed directory
+        # Use os.path.commonpath to check if real_path is under allowed_dir
+        is_allowed = False
+        for allowed_dir in ALLOWED_DATASET_DIRS:
+            # Expand and resolve allowed dir (but don't create it)
+            allowed_expanded = os.path.expanduser(allowed_dir)
+            allowed_real = os.path.realpath(allowed_expanded)
+
+            # Check if real_path is within allowed_real using commonpath
+            # This is more robust than string prefix matching
+            try:
+                common = os.path.commonpath([allowed_real, real_path])
+                if common == allowed_real:
+                    is_allowed = True
+                    break
+            except ValueError:
+                # Paths on different drives (Windows) or not comparable
+                continue
+
+        if not is_allowed:
+            logger.warning(f"Attempted access to disallowed path: {file_path} -> {real_path}")
+            logger.warning(f"Allowed directories: {ALLOWED_DATASET_DIRS}")
+            raise HTTPException(
+                status_code=403,
+                detail=f"Access denied: Path must be within allowed directories"
+            )
+
+        # Check if file exists
+        if not os.path.exists(real_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found: {file_path}"
+            )
+
+        # Check if it's actually a file (not a directory)
+        if not os.path.isfile(real_path):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Path is not a file: {file_path}"
+            )
+
+        return real_path
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Path validation error for {file_path}: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file path: {str(e)}"
+        )
 
 
 class LoadDatasetRequest(BaseModel):
@@ -713,9 +807,12 @@ async def analyze_file_path(
     Analyze a JSONL file from a local path.
 
     Use this for large files that are already on the server.
+
+    **Security**: Path must be within allowed directories to prevent LFI attacks.
+    Configure ALLOWED_DATASET_DIRS environment variable to set allowed directories.
     """
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+    # Validate and sanitize file path (prevents LFI attacks)
+    validated_path = validate_file_path(file_path)
 
     field_list = [f.strip() for f in fields.split(',') if f.strip()]
     if not field_list:
@@ -724,7 +821,7 @@ async def analyze_file_path(
         raise HTTPException(status_code=400, detail="Maximum 5 fields allowed")
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(validated_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
 
         return _analyze_jsonl_data(

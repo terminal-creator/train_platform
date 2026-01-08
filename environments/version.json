@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "created_at": "2026-01-08",
+  "python_version": ">=3.9,<3.12",
+  "cuda_version": "12.1",
+  "description": "Training Platform Environment v1.0.0 - Stable Release",
+
+  "components": {
+    "base": {
+      "description": "基础依赖 - 所有节点",
+      "file": "requirements-base.txt"
+    },
+    "training": {
+      "description": "训练节点依赖 - 包含 GPU 库",
+      "file": "requirements-training.txt",
+      "requires_gpu": true
+    },
+    "manager": {
+      "description": "管理节点依赖 - 不含 GPU",
+      "file": "requirements-manager.txt",
+      "requires_gpu": false
+    }
+  },
+
+  "key_dependencies": {
+    "pytorch": "2.1.2",
+    "transformers": "4.37.2",
+    "fastapi": "0.109.2",
+    "ray": "2.9.3",
+    "sqlalchemy": "2.0.27"
+  },
+
+  "verl": {
+    "type": "git_submodule",
+    "repository": "https://github.com/volcengine/verl.git",
+    "commit": "b12eb3bfad5897840cb3b1b094fe2d18061b4238",
+    "commit_date": "2026-01-08",
+    "commit_message": "[megatron] fix: Fix error in megatron workers (#4832)",
+    "note": "verl 作为 git submodule 管理，可通过 git submodule update 更新"
+  },
+
+  "compatibility": {
+    "tested_platforms": ["Linux", "macOS"],
+    "tested_cuda_versions": ["12.1"],
+    "tested_python_versions": ["3.9", "3.10", "3.11"]
+  },
+
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2026-01-08",
+      "changes": [
+        "Initial stable release",
+        "Fixed all dependency versions",
+        "Separated training and manager requirements",
+        "Added environment validation support"
+      ]
+    }
+  ]
+}

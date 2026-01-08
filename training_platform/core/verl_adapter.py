@@ -65,6 +65,24 @@ class VerlTrainingConfig:
     rollout_n: int = 5
     use_kl_loss: bool = True
 
+    # GRPO Reward Function Configuration
+    reward_fn_type: str = "math_verify"  # math_verify, format_check, custom
+    reward_fn_extract_answer: str = "boxed"  # boxed, last_number, json
+    reward_fn_compare_method: str = "exact"  # exact, numeric, fuzzy
+    reward_fn_answer_key: str = "solution"  # Key in dataset for ground truth
+    reward_fn_custom_path: Optional[str] = None  # Path to custom reward function script
+
+    # PPO Reward Model Configuration
+    reward_model_path: Optional[str] = None  # Path to reward model
+    reward_model_enable_gc: bool = True  # Enable gradient checkpointing
+    reward_model_offload: bool = False  # Offload params to CPU
+    reward_model_micro_batch: int = 4
+
+    # Unified Reward Script Configuration (for PPO/GRPO/GSPO)
+    reward_script_path: Optional[str] = None  # Path to reward script
+    reward_script_type: str = "rule"  # rule, api, model
+    reward_script_metadata: Optional[Dict[str, Any]] = None  # Extra params for reward script
+
     # LoRA
     lora_enabled: bool = False
     lora_rank: int = 8
@@ -102,12 +120,65 @@ class VerlTrainingConfig:
     resume_from_checkpoint: Optional[str] = None  # Path to checkpoint directory
     resume_mode: str = "auto"  # auto, disable, or resume_path
 
+    def _to_sft_args(self) -> List[str]:
+        """Generate arguments for verl's fsdp_sft_trainer"""
+        args = []
+
+        # Data configuration
+        args.append(f"data.train_files={self.train_data_path}")
+        # Use eval_data_path if provided, otherwise use train file as validation
+        val_files = self.eval_data_path if self.eval_data_path else self.train_data_path
+        args.append(f"data.val_files={val_files}")
+        args.append(f"data.train_batch_size={self.batch_size}")
+        # micro_batch_size must be <= batch_size and batch_size % micro_batch_size == 0
+        effective_micro_batch = min(self.micro_batch_size, self.batch_size)
+        args.append(f"data.micro_batch_size_per_gpu={effective_micro_batch}")
+        args.append(f"data.max_length={self.sequence_length}")
+        args.append("data.prompt_key=prompt")
+        args.append("data.response_key=response")
+
+        # Model configuration (use partial_pretrain for model path)
+        args.append(f"model.partial_pretrain={self.model_path}")
+        args.append(f"model.enable_gradient_checkpointing={str(self.activation_checkpointing)}")
+        args.append("model.trust_remote_code=True")
+
+        # LoRA if enabled
+        if self.lora_enabled:
+            args.append(f"model.lora_rank={self.lora_rank}")
+            args.append(f"model.lora_alpha={self.lora_alpha}")
+        else:
+            args.append("model.lora_rank=0")
+
+        # Optimizer configuration
+        args.append(f"optim.lr={self.learning_rate}")
+        args.append("optim.weight_decay=0.01")
+        args.append("optim.lr_warmup_steps_ratio=0.1")
+
+        # Trainer configuration
+        args.append(f"trainer.total_epochs={self.num_epochs}")
+        if self.max_steps:
+            args.append(f"trainer.total_training_steps={self.max_steps}")
+        args.append(f"trainer.save_freq={self.checkpoint_interval}")
+        args.append(f"trainer.project_name={self.project_name}")
+        exp_name = self.experiment_name or f"sft_{Path(self.model_path).name}"
+        args.append(f"trainer.experiment_name={exp_name}")
+        args.append(f"trainer.default_local_dir={self.output_dir}")
+        args.append("trainer.logger=[console]")
+        args.append(f"trainer.n_gpus_per_node={self.num_gpus}")
+        args.append(f"trainer.nnodes={self.num_nodes}")
+
+        return args
+
     def to_verl_command_args(self) -> List[str]:
         """
         Generate verl Hydra-style command line arguments.
 
         This follows verl's actual configuration pattern.
         """
+        # SFT has different parameter structure
+        if self.algorithm == VerlAlgorithm.SFT:
+            return self._to_sft_args()
+
         args = []
 
         # Algorithm
@@ -160,6 +231,44 @@ class VerlTrainingConfig:
         # Algorithm specific
         args.append("algorithm.use_kl_in_reward=False")
 
+        # Reward configuration for GRPO/PPO/GSPO
+        if self.algorithm in [VerlAlgorithm.GRPO, VerlAlgorithm.GSPO]:
+            # Use unified reward script if provided
+            if self.reward_script_path:
+                args.append(f"reward_model.reward_script_path={self.reward_script_path}")
+                args.append(f"reward_model.reward_script_type={self.reward_script_type}")
+                if self.reward_script_metadata:
+                    # Serialize metadata to JSON for passing to verl
+                    import json
+                    metadata_json = json.dumps(self.reward_script_metadata)
+                    args.append(f"reward_model.reward_script_metadata='{metadata_json}'")
+            else:
+                # Fallback to legacy reward function config
+                args.append(f"reward_model.reward_fn_type={self.reward_fn_type}")
+                if self.reward_fn_type == "math_verify":
+                    args.append(f"reward_model.extract_answer={self.reward_fn_extract_answer}")
+                    args.append(f"reward_model.compare_method={self.reward_fn_compare_method}")
+                if self.reward_fn_custom_path:
+                    args.append(f"reward_model.custom_path={self.reward_fn_custom_path}")
+
+        # PPO specific: Reward model (critic) configuration
+        if self.algorithm == VerlAlgorithm.PPO:
+            # Use reward script if provided
+            if self.reward_script_path:
+                args.append(f"reward_model.reward_script_path={self.reward_script_path}")
+                args.append(f"reward_model.reward_script_type={self.reward_script_type}")
+                if self.reward_script_metadata:
+                    import json
+                    metadata_json = json.dumps(self.reward_script_metadata)
+                    args.append(f"reward_model.reward_script_metadata='{metadata_json}'")
+
+            # Add critic (value function) model if provided
+            if self.reward_model_path:
+                args.append(f"critic.model.path={self.reward_model_path}")
+                args.append(f"critic.model.enable_gradient_checkpointing={str(self.reward_model_enable_gc)}")
+                args.append(f"critic.model.fsdp_config.param_offload={str(self.reward_model_offload)}")
+                args.append(f"critic.ppo_micro_batch_size_per_gpu={self.reward_model_micro_batch}")
+
         # Trainer configuration
         args.append("trainer.critic_warmup=0")
         args.append("trainer.logger=console")
@@ -187,7 +296,7 @@ class VerlTrainingConfig:
         return args
 
     def to_command(self) -> str:
-        """Generate full verl training command"""
+        """Generate full verl training command as string (for display/logging)"""
         if self.algorithm == VerlAlgorithm.SFT:
             cmd = "python3 -m verl.trainer.fsdp_sft_trainer"
         else:
@@ -195,6 +304,24 @@ class VerlTrainingConfig:
 
         args = self.to_verl_command_args()
         return f"{cmd} \\\n    " + " \\\n    ".join(args)
+
+    def to_command_list(self) -> List[str]:
+        """
+        Generate full verl training command as list (safe for subprocess without shell=True).
+
+        Returns:
+            List of command and arguments, e.g. ['python3', '-m', 'verl.trainer.main_ppo', 'arg1', 'arg2']
+        """
+        if self.algorithm == VerlAlgorithm.SFT:
+            cmd_list = ["python3", "-m", "verl.trainer.fsdp_sft_trainer"]
+        else:
+            cmd_list = ["python3", "-m", "verl.trainer.main_ppo"]
+
+        # Add all arguments
+        args = self.to_verl_command_args()
+        cmd_list.extend(args)
+
+        return cmd_list
 
     def to_shell_script(self, script_path: str = None) -> str:
         """Generate a shell script for running the training"""
@@ -250,7 +377,8 @@ def create_ray_entrypoint(config: VerlTrainingConfig) -> str:
     This returns a single command that can be passed to Ray's submit_job.
     """
     if config.algorithm == VerlAlgorithm.SFT:
-        base_cmd = "python3 -m verl.trainer.fsdp_sft_trainer"
+        # SFT uses torchrun for distributed training
+        base_cmd = f"torchrun --standalone --nnodes=1 --nproc_per_node={config.num_gpus} -m verl.trainer.fsdp_sft_trainer"
     else:
         base_cmd = "python3 -m verl.trainer.main_ppo"
 
@@ -297,13 +425,16 @@ class VerlJobRunner:
         For production use, submit via Ray instead.
         """
         try:
-            cmd = config.to_command()
-            logger.info(f"Starting verl training:\n{cmd}")
+            # Get command as list (safe - no shell injection)
+            cmd_list = config.to_command_list()
 
-            # Run process
+            # Also log human-readable command
+            cmd_str = config.to_command()
+            logger.info(f"Starting verl training:\n{cmd_str}")
+
+            # Run process WITHOUT shell=True for security
             process = subprocess.Popen(
-                cmd,
-                shell=True,
+                cmd_list,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

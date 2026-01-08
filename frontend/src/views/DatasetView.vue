@@ -15,7 +15,12 @@ import {
   Settings,
   PieChart,
   Tag,
-  Inbox
+  Inbox,
+  Cloud,
+  CloudOff,
+  Loader2,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-vue-next'
 
 const jobsStore = useJobsStore()
@@ -39,6 +44,37 @@ const uploadForm = ref({
 })
 const uploadFile = ref(null)
 const uploading = ref(false)
+const syncing = ref({})  // Track syncing status per dataset uuid
+
+const getSyncStatusInfo = (status) => {
+  const statusMap = {
+    'synced': { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100', text: 'Synced' },
+    'syncing': { icon: Loader2, color: 'text-blue-500', bg: 'bg-blue-100', text: 'Syncing', spin: true },
+    'failed': { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-100', text: 'Failed' },
+    'not_synced': { icon: CloudOff, color: 'text-gray-400', bg: 'bg-gray-100', text: 'Not Synced' },
+  }
+  return statusMap[status] || statusMap['not_synced']
+}
+
+const syncDataset = async (dataset) => {
+  syncing.value[dataset.uuid] = true
+  try {
+    const result = await api.syncTrainingDataset(dataset.uuid, true)
+    // Update the dataset in the list
+    const idx = trainingDatasets.value.findIndex(d => d.uuid === dataset.uuid)
+    if (idx !== -1) {
+      trainingDatasets.value[idx] = result
+    }
+    if (selectedDataset.value?.uuid === dataset.uuid) {
+      selectedDataset.value = result
+    }
+  } catch (error) {
+    console.error('Sync failed:', error)
+    alert('Sync failed: ' + error.message)
+  } finally {
+    syncing.value[dataset.uuid] = false
+  }
+}
 
 const formatFileSize = (mb) => {
   if (mb < 1) return `${(mb * 1024).toFixed(0)} KB`
@@ -236,9 +272,20 @@ onMounted(async () => {
                   {{ ds.file_format }}
                 </span>
               </div>
-              <div class="flex gap-3 text-2xs text-gray-500">
+              <div class="flex gap-3 text-2xs text-gray-500 items-center">
                 <span>{{ ds.total_rows.toLocaleString() }} rows</span>
                 <span>{{ formatFileSize(ds.file_size_mb) }}</span>
+                <span
+                  v-if="ds.sync_status"
+                  :class="['flex items-center gap-0.5', getSyncStatusInfo(ds.sync_status).color]"
+                  :title="ds.sync_status === 'synced' ? ds.remote_path : (ds.sync_error || '')"
+                >
+                  <component
+                    :is="getSyncStatusInfo(ds.sync_status).icon"
+                    :class="['w-3 h-3', getSyncStatusInfo(ds.sync_status).spin && 'animate-spin']"
+                  />
+                  <span class="text-2xs">{{ getSyncStatusInfo(ds.sync_status).text }}</span>
+                </span>
               </div>
               <div v-if="ds.label_fields?.length > 0" class="flex gap-1 mt-1.5 flex-wrap">
                 <span
@@ -508,6 +555,64 @@ onMounted(async () => {
                     </span>
                   </div>
                   <p v-else class="text-xs text-gray-500">No label fields configured</p>
+                </div>
+
+                <!-- Remote Sync Status -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Cloud class="w-4 h-4" />
+                    Remote Sync Status
+                  </h4>
+                  <div class="space-y-3">
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs text-gray-500">Status:</span>
+                      <span
+                        :class="[
+                          'flex items-center gap-1 px-2 py-0.5 rounded text-xs',
+                          getSyncStatusInfo(selectedDataset.sync_status).bg,
+                          getSyncStatusInfo(selectedDataset.sync_status).color
+                        ]"
+                      >
+                        <component
+                          :is="getSyncStatusInfo(selectedDataset.sync_status).icon"
+                          :class="['w-3.5 h-3.5', getSyncStatusInfo(selectedDataset.sync_status).spin && 'animate-spin']"
+                        />
+                        {{ getSyncStatusInfo(selectedDataset.sync_status).text }}
+                      </span>
+                    </div>
+
+                    <div v-if="selectedDataset.remote_path" class="text-xs">
+                      <span class="text-gray-500">Remote Path:</span>
+                      <code class="ml-2 px-1.5 py-0.5 bg-gray-200 rounded text-gray-700 break-all">
+                        {{ selectedDataset.remote_path }}
+                      </code>
+                    </div>
+
+                    <div v-if="selectedDataset.sync_error" class="text-xs">
+                      <span class="text-gray-500">Error:</span>
+                      <span class="ml-2 text-red-600">{{ selectedDataset.sync_error }}</span>
+                    </div>
+
+                    <div v-if="selectedDataset.synced_at" class="text-xs">
+                      <span class="text-gray-500">Last Synced:</span>
+                      <span class="ml-2 text-gray-700">{{ new Date(selectedDataset.synced_at).toLocaleString() }}</span>
+                    </div>
+
+                    <div class="pt-2 border-t border-gray-200">
+                      <button
+                        @click="syncDataset(selectedDataset)"
+                        :disabled="syncing[selectedDataset.uuid]"
+                        class="btn-secondary text-xs flex items-center gap-1.5"
+                      >
+                        <Loader2 v-if="syncing[selectedDataset.uuid]" class="w-3.5 h-3.5 animate-spin" />
+                        <Cloud v-else class="w-3.5 h-3.5" />
+                        {{ syncing[selectedDataset.uuid] ? 'Syncing...' : (selectedDataset.sync_status === 'synced' ? 'Re-sync to Remote' : 'Sync to Remote') }}
+                      </button>
+                      <p class="text-2xs text-gray-400 mt-1.5">
+                        Sync this dataset to the remote SSH server for training.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

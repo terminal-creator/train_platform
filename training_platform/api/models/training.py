@@ -60,6 +60,33 @@ class TrainingJobCreate(BaseModel):
     kl_coef: float = Field(default=0.02, ge=0, description="KL coefficient")
     rollout_n: int = Field(default=8, ge=1, description="Rollout samples per prompt")
 
+    # GRPO Reward Function Configuration
+    reward_fn_type: str = Field(default="math_verify", description="Reward function type: math_verify, format_check, custom")
+    reward_fn_extract_answer: str = Field(default="boxed", description="Answer extraction method: boxed, last_number, json")
+    reward_fn_compare_method: str = Field(default="exact", description="Comparison method: exact, numeric, fuzzy")
+    reward_fn_answer_key: str = Field(default="solution", description="Key in dataset for ground truth answer")
+    reward_fn_custom_path: Optional[str] = Field(default=None, description="Path to custom reward function script")
+
+    # PPO Reward Model Configuration
+    reward_model_path: Optional[str] = Field(default=None, description="Path to reward model (for PPO)")
+    reward_model_enable_gc: bool = Field(default=True, description="Enable gradient checkpointing for reward model")
+    reward_model_offload: bool = Field(default=False, description="Offload reward model params to CPU")
+    reward_model_micro_batch: int = Field(default=4, ge=1, description="Micro batch size for reward model")
+
+    # Unified Reward Script Configuration (for PPO/GRPO/GSPO)
+    reward_script_path: Optional[str] = Field(
+        default=None,
+        description="Path to reward script (e.g., reward_scripts/rule_math.py)"
+    )
+    reward_script_type: str = Field(
+        default="rule",
+        description="Reward script type: rule, api, model"
+    )
+    reward_script_metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Additional metadata passed to reward script (e.g., api_key, model_path, checks)"
+    )
+
     # Monitoring
     checkpoint_interval: int = Field(default=500, ge=1, description="Checkpoint interval")
     eval_interval: int = Field(default=1000, ge=1, description="Evaluation interval")
@@ -118,6 +145,24 @@ class TrainingJobUpdate(BaseModel):
     # Algorithm-specific
     kl_coef: Optional[float] = None
     rollout_n: Optional[int] = None
+
+    # GRPO Reward Function Configuration
+    reward_fn_type: Optional[str] = None
+    reward_fn_extract_answer: Optional[str] = None
+    reward_fn_compare_method: Optional[str] = None
+    reward_fn_answer_key: Optional[str] = None
+    reward_fn_custom_path: Optional[str] = None
+
+    # PPO Reward Model Configuration
+    reward_model_path: Optional[str] = None
+    reward_model_enable_gc: Optional[bool] = None
+    reward_model_offload: Optional[bool] = None
+    reward_model_micro_batch: Optional[int] = None
+
+    # Unified Reward Script Configuration
+    reward_script_path: Optional[str] = None
+    reward_script_type: Optional[str] = None
+    reward_script_metadata: Optional[Dict[str, Any]] = None
 
 
 class TrainingMetrics(BaseModel):

@@ -16,10 +16,17 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import time
 import logging
+import os
 
-from .routers import compute_router, surgery_router, jobs_router, monitoring_router, evaluation_router, training_dataset_router
+from .routers import compute_router, surgery_router, jobs_router, monitoring_router, evaluation_router, training_dataset_router, run_mode_router, recipes_router
 from .routers.websocket import router as websocket_router, metrics_collector
+from .routers.config_diff import router as config_diff_router
+from .routers.dataset_version import router as dataset_version_router
+from .routers.experience import router as experience_router
+from .routers.pipelines import router as pipelines_router
+from .routers.celery_tasks_api import router as celery_tasks_router
 from ..core.database import init_db
+from .auth import ApiKeyAuthMiddleware, create_default_api_key
 
 # Configure logging
 logging.basicConfig(
@@ -37,6 +44,17 @@ async def lifespan(app: FastAPI):
     # Initialize database
     logger.info("Initializing database...")
     init_db()
+
+    # Create default API key if none exist
+    logger.info("Checking API keys...")
+    default_key = create_default_api_key()
+    if default_key:
+        logger.warning("=" * 80)
+        logger.warning("DEFAULT API KEY CREATED:")
+        logger.warning(f"  {default_key}")
+        logger.warning("SAVE THIS KEY - IT WILL NOT BE SHOWN AGAIN!")
+        logger.warning("Add it to your requests as: X-API-KEY: <key>")
+        logger.warning("=" * 80)
 
     # Start metrics collector
     logger.info("Starting metrics collector...")
@@ -99,14 +117,28 @@ All training types support LoRA (Low-Rank Adaptation) for efficient fine-tuning.
     redoc_url="/redoc",
 )
 
+# Configure CORS origins from environment
+# In production, set ALLOWED_ORIGINS="http://example.com,https://example.com"
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allowed_origins,  # Restricted origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_headers=["Content-Type", "Authorization", "X-API-KEY"],
 )
+
+# Add API Key authentication middleware
+# Set DISABLE_AUTH=true in development to disable authentication
+auth_enabled = os.getenv("DISABLE_AUTH", "false").lower() != "true"
+if auth_enabled:
+    logger.info("API Key authentication enabled")
+    app.add_middleware(ApiKeyAuthMiddleware, enabled=True)
+else:
+    logger.warning("API Key authentication DISABLED (development mode)")
 
 
 # Request timing middleware
@@ -122,11 +154,29 @@ async def add_timing_header(request: Request, call_next):
 # Exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
-    )
+    logger.error(f"Unhandled exception on {request.url.path}: {exc}", exc_info=True)
+
+    # In production, don't leak error details
+    # Set DEBUG=true to enable detailed error messages
+    debug_mode = os.getenv("DEBUG", "false").lower() == "true"
+
+    if debug_mode:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+                "error": str(exc),
+                "type": type(exc).__name__,
+            },
+        )
+    else:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+                "error": "An unexpected error occurred"
+            },
+        )
 
 
 # Include routers
@@ -137,6 +187,13 @@ app.include_router(monitoring_router, prefix="/api/v1")
 app.include_router(websocket_router, prefix="/api/v1")
 app.include_router(evaluation_router, prefix="/api/v1")
 app.include_router(training_dataset_router, prefix="/api/v1")
+app.include_router(run_mode_router, prefix="/api/v1")
+app.include_router(recipes_router, prefix="/api/v1")
+app.include_router(config_diff_router, prefix="/api/v1")  # Phase 2: Config comparison
+app.include_router(dataset_version_router, prefix="/api/v1")  # Phase 2: Data versioning
+app.include_router(experience_router, prefix="/api/v1")  # Phase 2: Experience reuse
+app.include_router(pipelines_router, prefix="/api/v1")  # Phase 3: Pipelines
+app.include_router(celery_tasks_router, prefix="/api/v1")  # Phase 3: Celery tasks
 
 # Import dataset router (optional - requires Milvus)
 try:
@@ -162,6 +219,13 @@ async def root():
             "monitoring": "/api/v1/monitoring",
             "evaluation": "/api/v1/evaluation",
             "training_datasets": "/api/v1/training-datasets",
+            "run_mode": "/api/v1/run-mode",
+            "recipes": "/api/v1/recipes",
+            "config_diff": "/api/v1/config-diff",
+            "dataset_versions": "/api/v1/dataset-versions",
+            "experience": "/api/v1/experience",
+            "pipelines": "/api/v1/pipelines",
+            "celery_tasks": "/api/v1/celery-tasks",
         },
     }
 

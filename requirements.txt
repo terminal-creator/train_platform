@@ -32,6 +32,14 @@ ray[default]>=2.9.0
 pymilvus>=2.3.0
 openai>=1.0.0  # For embeddings via Dashscope
 
+# SSH Remote Execution
+paramiko>=3.4.0
+
+# Celery (Phase 3)
+celery[redis]>=5.3.0
+redis>=5.0.0
+flower>=2.0.0
+
 # Utilities
 numpy>=1.24.0
 tqdm>=4.66.0

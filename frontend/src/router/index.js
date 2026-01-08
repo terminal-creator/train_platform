@@ -40,6 +40,33 @@ const routes = [
     path: '/evaluation',
     name: 'evaluation',
     component: () => import('@/views/EvaluationView.vue')
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/SettingsView.vue')
+  },
+  // Phase 4: Pipeline 管理
+  {
+    path: '/pipelines',
+    name: 'pipelines',
+    component: () => import('@/views/PipelineList.vue')
+  },
+  {
+    path: '/pipelines/create',
+    name: 'pipeline-create',
+    component: () => import('@/views/PipelineCreate.vue')
+  },
+  {
+    path: '/pipelines/:uuid',
+    name: 'pipeline-detail',
+    component: () => import('@/views/PipelineDetail.vue')
+  },
+  // Phase 4: 任务监控
+  {
+    path: '/tasks',
+    name: 'tasks',
+    component: () => import('@/views/TaskMonitor.vue')
   }
 ]
 

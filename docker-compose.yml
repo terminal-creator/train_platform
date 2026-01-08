@@ -80,7 +80,7 @@ services:
     networks:
       - milvus-network
 
-  # Redis (可选，用于缓存)
+  # Redis (用于 Celery 任务队列)
   redis:
     container_name: train-redis
     image: redis:7-alpine
@@ -96,6 +96,66 @@ services:
       retries: 5
     networks:
       - milvus-network
+
+  # Celery Worker (Phase 3)
+  celery-worker:
+    container_name: train-celery-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    command: celery -A training_platform.core.celery_config worker --loglevel=info --concurrency=4
+    volumes:
+      - ./training_platform:/app/training_platform
+      - ./logs:/app/logs
+      - ./checkpoints:/app/checkpoints
+      - ./datasets:/app/datasets
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./training_platform.db
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+    networks:
+      - milvus-network
+    restart: unless-stopped
+
+  # Celery Beat (Periodic tasks scheduler)
+  celery-beat:
+    container_name: train-celery-beat
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    command: celery -A training_platform.core.celery_config beat --loglevel=info
+    volumes:
+      - ./training_platform:/app/training_platform
+      - ./logs:/app/logs
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=sqlite:///./training_platform.db
+    depends_on:
+      - redis
+    networks:
+      - milvus-network
+    restart: unless-stopped
+
+  # Celery Flower (Monitoring UI)
+  flower:
+    container_name: train-flower
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    command: celery -A training_platform.core.celery_config flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - FLOWER_BASIC_AUTH=admin:admin123
+    depends_on:
+      - redis
+      - celery-worker
+    networks:
+      - milvus-network
+    restart: unless-stopped
 
 networks:
   milvus-network:

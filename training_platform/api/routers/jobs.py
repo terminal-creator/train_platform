@@ -53,6 +53,11 @@ from ...core.verl_adapter import (
     VerlAlgorithm,
     create_ray_entrypoint,
 )
+from ...core.run_mode import (
+    RunMode,
+    get_current_runner,
+    load_run_mode_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +66,65 @@ router = APIRouter(prefix="/jobs", tags=["Training Jobs"])
 # Default directories for models and datasets
 MODELS_DIR = Path(os.environ.get("MODELS_DIR", "./models"))
 DATASETS_DIR = Path(os.environ.get("DATASETS_DIR", "./datasets"))
+REWARD_SCRIPTS_DIR = Path(os.environ.get("REWARD_SCRIPTS_DIR", "./reward_scripts"))
+
+
+@router.get("/available-reward-scripts", response_model=List[Dict[str, Any]])
+async def list_available_reward_scripts() -> List[Dict[str, Any]]:
+    """
+    List available reward scripts in the reward_scripts directory.
+
+    Each script should implement the standard interface:
+    - Input: JSON via stdin with prompts, responses, metadata
+    - Output: JSON via stdout with rewards, details
+    """
+    scripts = []
+
+    if not REWARD_SCRIPTS_DIR.exists():
+        return scripts
+
+    for item in REWARD_SCRIPTS_DIR.rglob("*.py"):
+        if item.name.startswith('_') or item.name.startswith('.'):
+            continue
+
+        # Read first few lines to get description
+        description = ""
+        script_type = "rule"  # Default type
+        try:
+            with open(item, "r", encoding="utf-8") as f:
+                content = f.read(2000)  # Read first 2000 chars
+
+            # Extract docstring
+            import re
+            docstring_match = re.search(r'"""(.*?)"""', content, re.DOTALL)
+            if docstring_match:
+                description = docstring_match.group(1).strip().split('\n')[0]
+
+            # Detect type from filename or content
+            if "api" in item.name.lower() or "openai" in content.lower() or "anthropic" in content.lower():
+                script_type = "api"
+            elif "model" in item.name.lower() or "AutoModelForSequenceClassification" in content:
+                script_type = "model"
+            else:
+                script_type = "rule"
+
+        except Exception:
+            pass
+
+        # Get relative path from reward_scripts dir
+        rel_path = item.relative_to(REWARD_SCRIPTS_DIR)
+
+        scripts.append({
+            "name": item.stem,
+            "path": str(rel_path),
+            "full_path": str(item.absolute()),
+            "type": script_type,
+            "description": description,
+        })
+
+    # Sort by name
+    scripts.sort(key=lambda x: x["name"])
+    return scripts
 
 
 @router.get("/available-models", response_model=List[Dict[str, Any]])
@@ -339,6 +403,21 @@ async def create_job(
             "eval_benchmarks": request.eval_benchmarks,
             "config_overrides": request.config_overrides,
             "resume_from_checkpoint": request.resume_from_checkpoint,
+            # GRPO Reward Function Config
+            "reward_fn_type": request.reward_fn_type,
+            "reward_fn_extract_answer": request.reward_fn_extract_answer,
+            "reward_fn_compare_method": request.reward_fn_compare_method,
+            "reward_fn_answer_key": request.reward_fn_answer_key,
+            "reward_fn_custom_path": request.reward_fn_custom_path,
+            # PPO Reward Model Config
+            "reward_model_path": request.reward_model_path,
+            "reward_model_enable_gc": request.reward_model_enable_gc,
+            "reward_model_offload": request.reward_model_offload,
+            "reward_model_micro_batch": request.reward_model_micro_batch,
+            # Unified Reward Script Config
+            "reward_script_path": request.reward_script_path,
+            "reward_script_type": request.reward_script_type,
+            "reward_script_metadata": request.reward_script_metadata,
         },
     )
 
@@ -512,6 +591,22 @@ def _create_verl_config_from_job(job: DBTrainingJob) -> VerlTrainingConfig:
     checkpoint_interval = config.get("checkpoint_interval", 500)
     eval_interval = config.get("eval_interval", 100)
 
+    # Extract reward configuration
+    reward_fn_type = config.get("reward_fn_type", "math_verify")
+    reward_fn_extract_answer = config.get("reward_fn_extract_answer", "boxed")
+    reward_fn_compare_method = config.get("reward_fn_compare_method", "exact")
+    reward_fn_answer_key = config.get("reward_fn_answer_key", "solution")
+    reward_fn_custom_path = config.get("reward_fn_custom_path")
+    reward_model_path = config.get("reward_model_path")
+    reward_model_enable_gc = config.get("reward_model_enable_gc", True)
+    reward_model_offload = config.get("reward_model_offload", False)
+    reward_model_micro_batch = config.get("reward_model_micro_batch", 4)
+
+    # Extract unified reward script configuration
+    reward_script_path = config.get("reward_script_path")
+    reward_script_type = config.get("reward_script_type", "rule")
+    reward_script_metadata = config.get("reward_script_metadata", {})
+
     return VerlTrainingConfig(
         # Model
         model_path=job.model_path,
@@ -553,11 +648,29 @@ def _create_verl_config_from_job(job: DBTrainingJob) -> VerlTrainingConfig:
         # Resume from checkpoint
         resume_from_checkpoint=config.get("resume_from_checkpoint"),
         resume_mode="resume_path" if config.get("resume_from_checkpoint") else "auto",
+
+        # GRPO Reward Function Config
+        reward_fn_type=reward_fn_type,
+        reward_fn_extract_answer=reward_fn_extract_answer,
+        reward_fn_compare_method=reward_fn_compare_method,
+        reward_fn_answer_key=reward_fn_answer_key,
+        reward_fn_custom_path=reward_fn_custom_path,
+
+        # PPO Reward Model Config
+        reward_model_path=reward_model_path,
+        reward_model_enable_gc=reward_model_enable_gc,
+        reward_model_offload=reward_model_offload,
+        reward_model_micro_batch=reward_model_micro_batch,
+
+        # Unified Reward Script Config
+        reward_script_path=reward_script_path,
+        reward_script_type=reward_script_type,
+        reward_script_metadata=reward_script_metadata,
     )
 
 
 async def _run_training_job(job_id: str, session: Session):
-    """Background task to run training via Ray"""
+    """Background task to run training via configured runner (Local or SSH)"""
     from .websocket import push_status_update, push_metrics_update
 
     repo = JobRepository(session)
@@ -571,34 +684,47 @@ async def _run_training_job(job_id: str, session: Session):
         # Create VerlTrainingConfig from database job
         verl_config = _create_verl_config_from_job(job)
 
-        # Create Ray job config with verl configuration
-        ray_config = RayJobConfig(
+        # Get the current run mode configuration
+        run_mode_config = load_run_mode_config()
+        runner = get_current_runner()
+
+        # Log the generated command for debugging
+        entrypoint = create_ray_entrypoint(verl_config)
+        logger.info(f"Job {job_id} entrypoint command:\n{entrypoint}")
+        logger.info(f"Job {job_id} run mode: {run_mode_config.mode.value}")
+
+        # Submit job using unified runner
+        result = runner.submit_job(
             job_id=job.uuid,
             name=job.name,
             verl_config=verl_config,
             num_gpus=job.num_gpus,
-            output_dir=f"./outputs/{job.uuid}",
         )
 
-        # Log the generated command for debugging
-        entrypoint = ray_config.to_entrypoint()
-        logger.info(f"Job {job_id} entrypoint command:\n{entrypoint}")
-
-        # Submit to Ray
-        runner = get_default_runner()
-        result = runner.submit_job(ray_config)
-
         if result.get("success"):
-            job.ray_job_id = result.get("ray_job_id")
+            # Store job reference (ray_job_id for local, pid for SSH)
+            job.ray_job_id = result.get("ray_job_id") or result.get("pid")
             job.status = DBJobStatus.RUNNING
             job.started_at = datetime.utcnow()
-            job.output_path = f"./outputs/{job.uuid}"
+            job.output_path = result.get("log_file") or f"./outputs/{job.uuid}"
+
+            # Store run mode in config for later reference
+            config = job.config or {}
+            config["run_mode"] = run_mode_config.mode.value
+            job.config = config
+
             repo.update(job)
 
             # Push WebSocket update
-            await push_status_update(job_id, "running", "Training started")
+            mode_str = run_mode_config.mode.value
+            await push_status_update(job_id, "running", f"Training started ({mode_str} mode)")
 
-            logger.info(f"Job {job_id} submitted to Ray: {job.ray_job_id}")
+            logger.info(f"Job {job_id} submitted via {mode_str}: {job.ray_job_id}")
+
+            # For SSH mode, start log streaming if needed
+            if run_mode_config.mode == RunMode.SSH:
+                _start_ssh_log_streaming(job_id, runner)
+
         else:
             job.status = DBJobStatus.FAILED
             repo.update(job)
@@ -611,6 +737,23 @@ async def _run_training_job(job_id: str, session: Session):
         logger.error(f"Error running job {job_id}: {e}")
         job.status = DBJobStatus.FAILED
         repo.update(job)
+
+
+def _start_ssh_log_streaming(job_id: str, runner):
+    """Start SSH log streaming and push to WebSocket"""
+    from .websocket import push_log_entry
+    import asyncio
+
+    def log_callback(log_line: str):
+        # Push log to WebSocket (run in event loop)
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(push_log_entry(job_id, log_line))
+        except Exception as e:
+            logger.debug(f"Failed to push log: {e}")
+
+    runner.start_log_streaming(job_id, log_callback)
 
 
 @router.post("/{job_id}/start")
@@ -663,10 +806,14 @@ async def stop_job(
             detail=f"Job {job_id} cannot be stopped (current: {job.status.value})"
         )
 
-    # Stop Ray job if available
+    # Determine run mode from job config
+    config = job.config or {}
+    job_run_mode = config.get("run_mode", "local")
+
+    # Stop job using appropriate runner
     if job.ray_job_id:
-        runner = get_default_runner()
-        runner.stop_job(job.ray_job_id)
+        runner = get_current_runner()
+        runner.stop_job(job_id, job.ray_job_id)
 
     job.status = DBJobStatus.CANCELLED
     job.completed_at = datetime.utcnow()
@@ -877,12 +1024,12 @@ async def get_job_logs(
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
-    # Try to get logs from Ray if job is running
+    # Try to get logs from runner if job is running
     logs = []
     if job.ray_job_id and job.status == DBJobStatus.RUNNING:
-        runner = get_default_runner()
-        ray_logs = runner.get_job_logs(job.ray_job_id)
-        logs = ray_logs.split('\n') if ray_logs else []
+        runner = get_current_runner()
+        runner_logs = runner.get_job_logs(job_id, job.ray_job_id, lines=lines)
+        logs = runner_logs.split('\n') if runner_logs else []
     else:
         # Get from database
         db_logs, total = log_repo.get_logs(job_id, offset=offset, limit=lines)

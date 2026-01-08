@@ -1,0 +1,31 @@
+[Unit]
+Description=Celery Beat Scheduler (Periodic Tasks)
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=training
+Group=training
+WorkingDirectory=/opt/training_platform
+
+# Environment
+Environment=REDIS_URL=redis://localhost:6381/0
+Environment=DATABASE_URL=postgresql://training_platform:password@localhost:5432/training_platform
+Environment=PYTHONPATH=/opt/training_platform
+
+# Command
+ExecStart=/opt/training_platform/venv/bin/celery \
+    -A training_platform.core.celery_config beat \
+    -l info \
+    --pidfile=/var/run/celery/beat.pid \
+    --logfile=/var/log/celery/beat.log
+
+# PID file
+PIDFile=/var/run/celery/beat.pid
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
