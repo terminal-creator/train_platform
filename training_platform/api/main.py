@@ -34,6 +34,7 @@ from .routers.pipelines import router as pipelines_router
 from .routers.celery_tasks_api import router as celery_tasks_router
 from ..core.database import init_db
 from .auth import ApiKeyAuthMiddleware, create_default_api_key
+from .errors import register_error_handlers
 
 # Configure logging
 logging.basicConfig(
@@ -158,32 +159,8 @@ async def add_timing_header(request: Request, call_next):
     return response
 
 
-# Exception handler
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception on {request.url.path}: {exc}", exc_info=True)
-
-    # In production, don't leak error details
-    # Set DEBUG=true to enable detailed error messages
-    debug_mode = os.getenv("DEBUG", "false").lower() == "true"
-
-    if debug_mode:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Internal server error",
-                "error": str(exc),
-                "type": type(exc).__name__,
-            },
-        )
-    else:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Internal server error",
-                "error": "An unexpected error occurred"
-            },
-        )
+# Register enhanced error handlers
+register_error_handlers(app)
 
 
 # Include routers

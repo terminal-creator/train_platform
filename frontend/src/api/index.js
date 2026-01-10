@@ -141,26 +141,30 @@ export const getRunnerStatus = () => api.get('/run-mode/status')
 export const getRemoteModels = () => api.get('/run-mode/remote/models')
 export const getRemoteDatasets = () => api.get('/run-mode/remote/datasets')
 
-// WebSocket for live metrics
-export const createMetricsWebSocket = (jobId) => {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const host = window.location.host
-  return new WebSocket(`${protocol}//${host}/api/v1/monitoring/${jobId}/live`)
+// WebSocket for live metrics (using enhanced WebSocket utility)
+import {
+  createJobMetricsWS,
+  createJobLogsWS,
+  createDashboardWS
+} from '../utils/websocket'
+
+export const createMetricsWebSocket = (jobId, options = {}) => {
+  return createJobMetricsWS(jobId, options)
 }
 
+export const createLogsWebSocket = (jobId, options = {}) => {
+  return createJobLogsWS(jobId, options)
+}
+
+export const createDashboardWebSocket = (options = {}) => {
+  return createDashboardWS(options)
+}
+
+// Legacy function for backwards compatibility
 export const connectMetricsWs = (jobId, onMessage) => {
-  const ws = createMetricsWebSocket(jobId)
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data)
-      onMessage(data)
-    } catch (e) {
-      console.error('Failed to parse WebSocket message:', e)
-    }
-  }
-  ws.onerror = (error) => {
-    console.error('WebSocket error:', error)
-  }
+  const ws = createMetricsWebSocket(jobId, { debug: false })
+  ws.on('message', onMessage)
+  ws.connect()
   return ws
 }
 
