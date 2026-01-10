@@ -69,3 +69,6 @@ frontend/dist/
 *.tmp
 *.temp
 .cache/
+
+# Redundant verl (use environments/verl instead)
+/verl/
