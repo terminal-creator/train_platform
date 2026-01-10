@@ -324,20 +324,30 @@ async def get_dataset_preview(request: Dict[str, str]) -> Dict[str, Any]:
 
 def _db_job_to_response(job: DBTrainingJob, latest_metrics: DBTrainingMetric = None) -> TrainingJobResponse:
     """Convert database job to API response"""
+    import math
+
+    def sanitize_float(value):
+        """Convert inf/nan to None for JSON compatibility"""
+        if value is None:
+            return None
+        if math.isinf(value) or math.isnan(value):
+            return None
+        return value
+
     metrics = None
     if latest_metrics:
         metrics = TrainingMetrics(
             step=latest_metrics.step,
             timestamp=latest_metrics.timestamp,
             epoch=latest_metrics.epoch,
-            policy_loss=latest_metrics.policy_loss,
-            value_loss=latest_metrics.value_loss,
-            total_loss=latest_metrics.total_loss,
-            reward_mean=latest_metrics.reward_mean,
-            reward_std=latest_metrics.reward_std,
-            kl_divergence=latest_metrics.kl_divergence,
-            entropy=latest_metrics.entropy,
-            learning_rate=latest_metrics.learning_rate,
+            policy_loss=sanitize_float(latest_metrics.policy_loss),
+            value_loss=sanitize_float(latest_metrics.value_loss),
+            total_loss=sanitize_float(latest_metrics.total_loss),
+            reward_mean=sanitize_float(latest_metrics.reward_mean),
+            reward_std=sanitize_float(latest_metrics.reward_std),
+            kl_divergence=sanitize_float(latest_metrics.kl_divergence),
+            entropy=sanitize_float(latest_metrics.entropy),
+            learning_rate=sanitize_float(latest_metrics.learning_rate),
         )
 
     return TrainingJobResponse(
