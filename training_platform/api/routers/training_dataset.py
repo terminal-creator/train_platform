@@ -106,7 +106,203 @@ class DistributionResponse(BaseModel):
     total: int
 
 
+class DatasetStatsResponse(BaseModel):
+    """Response for dataset statistics overview"""
+    total_samples: int
+    avg_turns: float
+    avg_prompt_chars: float
+    avg_response_chars: float
+    avg_total_chars: float
+    format_type: str  # 'messages' or 'prompt_response'
+    has_system_prompt: float  # percentage
+    # Length distribution buckets
+    prompt_length_distribution: Dict[str, int]
+    response_length_distribution: Dict[str, int]
+    turns_distribution: Dict[str, int]
+
+
+class QualityIssue(BaseModel):
+    """A quality issue found in the dataset"""
+    issue_type: str
+    count: int
+    percentage: float
+    sample_indices: List[int]  # First few indices with this issue
+
+
+class QualityCheckResponse(BaseModel):
+    """Response for quality check"""
+    total_samples: int
+    issues_found: int
+    quality_score: float  # 0-100
+    issues: List[QualityIssue]
+
+
 # ============== Helper Functions ==============
+
+def _get_length_bucket(length: int) -> str:
+    """Get length bucket label for distribution."""
+    if length < 50:
+        return "0-50"
+    elif length < 100:
+        return "50-100"
+    elif length < 200:
+        return "100-200"
+    elif length < 500:
+        return "200-500"
+    elif length < 1000:
+        return "500-1k"
+    elif length < 2000:
+        return "1k-2k"
+    else:
+        return "2k+"
+
+
+def _get_turns_bucket(turns: int) -> str:
+    """Get turns bucket label."""
+    if turns == 1:
+        return "1轮"
+    elif turns == 2:
+        return "2轮"
+    elif turns == 3:
+        return "3轮"
+    elif turns <= 5:
+        return "4-5轮"
+    else:
+        return "6+轮"
+
+
+def _analyze_record(record: Dict) -> Dict:
+    """Analyze a single record for statistics."""
+    result = {
+        "format": "unknown",
+        "turns": 0,
+        "prompt_chars": 0,
+        "response_chars": 0,
+        "total_chars": 0,
+        "has_system": False,
+    }
+
+    if "messages" in record and isinstance(record["messages"], list):
+        result["format"] = "messages"
+        messages = record["messages"]
+
+        prompt_chars = 0
+        response_chars = 0
+        turns = 0
+
+        for msg in messages:
+            content = msg.get("content", "")
+            role = msg.get("role", "")
+
+            if role == "system":
+                result["has_system"] = True
+                prompt_chars += len(content)
+            elif role == "user":
+                prompt_chars += len(content)
+                turns += 1
+            elif role == "assistant":
+                response_chars += len(content)
+
+        result["turns"] = max(turns, 1)
+        result["prompt_chars"] = prompt_chars
+        result["response_chars"] = response_chars
+        result["total_chars"] = prompt_chars + response_chars
+    else:
+        result["format"] = "prompt_response"
+        result["turns"] = 1
+
+        prompt = record.get("prompt", "")
+        response = record.get("response", "")
+
+        result["prompt_chars"] = len(str(prompt))
+        result["response_chars"] = len(str(response))
+        result["total_chars"] = result["prompt_chars"] + result["response_chars"]
+
+    return result
+
+
+def _check_quality_issues(records: List[Dict]) -> List[QualityIssue]:
+    """Check for quality issues in the dataset."""
+    issues = []
+
+    # Track issues
+    short_response_indices = []
+    empty_response_indices = []
+    very_long_indices = []
+    duplicate_prompts = {}
+
+    for i, record in enumerate(records):
+        analysis = _analyze_record(record)
+
+        # Check for empty response
+        if analysis["response_chars"] == 0:
+            empty_response_indices.append(i)
+        # Check for short response (< 20 chars)
+        elif analysis["response_chars"] < 20:
+            short_response_indices.append(i)
+
+        # Check for very long samples (> 4000 chars total)
+        if analysis["total_chars"] > 4000:
+            very_long_indices.append(i)
+
+        # Check for duplicate prompts (simplified check)
+        if "messages" in record:
+            # Get user messages as key
+            user_msgs = [m.get("content", "")[:100] for m in record.get("messages", []) if m.get("role") == "user"]
+            prompt_key = "|".join(user_msgs)
+        else:
+            prompt_key = str(record.get("prompt", ""))[:100]
+
+        if prompt_key:
+            if prompt_key not in duplicate_prompts:
+                duplicate_prompts[prompt_key] = []
+            duplicate_prompts[prompt_key].append(i)
+
+    total = len(records)
+
+    # Empty responses
+    if empty_response_indices:
+        issues.append(QualityIssue(
+            issue_type="空回复",
+            count=len(empty_response_indices),
+            percentage=round(len(empty_response_indices) / total * 100, 1),
+            sample_indices=empty_response_indices[:5],
+        ))
+
+    # Short responses
+    if short_response_indices:
+        issues.append(QualityIssue(
+            issue_type="回复过短(<20字)",
+            count=len(short_response_indices),
+            percentage=round(len(short_response_indices) / total * 100, 1),
+            sample_indices=short_response_indices[:5],
+        ))
+
+    # Very long samples
+    if very_long_indices:
+        issues.append(QualityIssue(
+            issue_type="内容过长(>4000字)",
+            count=len(very_long_indices),
+            percentage=round(len(very_long_indices) / total * 100, 1),
+            sample_indices=very_long_indices[:5],
+        ))
+
+    # Duplicates
+    duplicate_indices = []
+    for key, indices in duplicate_prompts.items():
+        if len(indices) > 1:
+            duplicate_indices.extend(indices[1:])  # Keep first, mark rest as duplicates
+
+    if duplicate_indices:
+        issues.append(QualityIssue(
+            issue_type="疑似重复",
+            count=len(duplicate_indices),
+            percentage=round(len(duplicate_indices) / total * 100, 1),
+            sample_indices=duplicate_indices[:5],
+        ))
+
+    return issues
+
 
 def detect_label_fields(records: List[Dict], reserved_fields: set = None) -> List[str]:
     """
@@ -467,6 +663,147 @@ async def get_distribution(
     return results
 
 
+@router.get("/{uuid}/stats", response_model=DatasetStatsResponse)
+async def get_dataset_stats(
+    uuid: str,
+    session: Session = Depends(get_session),
+):
+    """
+    Get comprehensive statistics for a dataset.
+
+    Includes length distributions, turn counts, and format analysis.
+    """
+    repo = TrainingDatasetRepository(session)
+    dataset = repo.get_by_uuid(uuid)
+
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    # Load records
+    records = load_dataset_records(dataset.file_path, dataset.file_format)
+
+    if not records:
+        raise HTTPException(status_code=400, detail="Dataset is empty")
+
+    # Analyze all records
+    analyses = [_analyze_record(r) for r in records]
+
+    # Calculate averages
+    total = len(analyses)
+    avg_turns = sum(a["turns"] for a in analyses) / total
+    avg_prompt_chars = sum(a["prompt_chars"] for a in analyses) / total
+    avg_response_chars = sum(a["response_chars"] for a in analyses) / total
+    avg_total_chars = sum(a["total_chars"] for a in analyses) / total
+
+    # Determine format type
+    format_counts = {}
+    for a in analyses:
+        fmt = a["format"]
+        format_counts[fmt] = format_counts.get(fmt, 0) + 1
+    format_type = max(format_counts, key=format_counts.get)
+
+    # System prompt percentage
+    has_system_count = sum(1 for a in analyses if a["has_system"])
+    has_system_pct = round(has_system_count / total * 100, 1)
+
+    # Length distributions
+    prompt_length_dist = {}
+    response_length_dist = {}
+    turns_dist = {}
+
+    for a in analyses:
+        # Prompt length bucket
+        bucket = _get_length_bucket(a["prompt_chars"])
+        prompt_length_dist[bucket] = prompt_length_dist.get(bucket, 0) + 1
+
+        # Response length bucket
+        bucket = _get_length_bucket(a["response_chars"])
+        response_length_dist[bucket] = response_length_dist.get(bucket, 0) + 1
+
+        # Turns bucket
+        bucket = _get_turns_bucket(a["turns"])
+        turns_dist[bucket] = turns_dist.get(bucket, 0) + 1
+
+    return DatasetStatsResponse(
+        total_samples=total,
+        avg_turns=round(avg_turns, 2),
+        avg_prompt_chars=round(avg_prompt_chars, 0),
+        avg_response_chars=round(avg_response_chars, 0),
+        avg_total_chars=round(avg_total_chars, 0),
+        format_type=format_type,
+        has_system_prompt=has_system_pct,
+        prompt_length_distribution=prompt_length_dist,
+        response_length_distribution=response_length_dist,
+        turns_distribution=turns_dist,
+    )
+
+
+@router.get("/{uuid}/quality-check", response_model=QualityCheckResponse)
+async def check_dataset_quality(
+    uuid: str,
+    session: Session = Depends(get_session),
+):
+    """
+    Run quality checks on the dataset.
+
+    Detects issues like empty responses, short responses, duplicates, etc.
+    """
+    repo = TrainingDatasetRepository(session)
+    dataset = repo.get_by_uuid(uuid)
+
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    # Load records
+    records = load_dataset_records(dataset.file_path, dataset.file_format)
+
+    if not records:
+        raise HTTPException(status_code=400, detail="Dataset is empty")
+
+    # Check for issues
+    issues = _check_quality_issues(records)
+
+    # Calculate quality score (100 - penalty for each issue type)
+    total_issues = sum(issue.count for issue in issues)
+    issue_ratio = total_issues / len(records)
+    quality_score = max(0, 100 - issue_ratio * 100)
+
+    return QualityCheckResponse(
+        total_samples=len(records),
+        issues_found=total_issues,
+        quality_score=round(quality_score, 1),
+        issues=issues,
+    )
+
+
+def _build_loss_segments_from_messages(messages: List[Dict]) -> List[LossSegment]:
+    """Build loss segments from OpenAI messages format."""
+    segments = []
+    for msg in messages:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+
+        if role == "system":
+            segments.append(LossSegment(
+                field="system",
+                text=content,
+                computes_loss=False,
+            ))
+        elif role == "user":
+            segments.append(LossSegment(
+                field="user",
+                text=content,
+                computes_loss=False,
+            ))
+        elif role == "assistant":
+            segments.append(LossSegment(
+                field="assistant",
+                text=content,
+                computes_loss=True,  # Only assistant responses compute loss
+            ))
+    return segments
+
+
 @router.get("/{uuid}/sample/{index}", response_model=SampleResponse)
 async def get_sample(
     uuid: str,
@@ -478,6 +815,10 @@ async def get_sample(
 
     Returns the sample data along with segments indicating which parts
     are used for loss computation (typically only the response field).
+
+    Supports both formats:
+    - OpenAI messages format: {"messages": [{"role": "...", "content": "..."}]}
+    - Simple format: {"prompt": "...", "response": "..."}
     """
     repo = TrainingDatasetRepository(session)
     dataset = repo.get_by_uuid(uuid)
@@ -495,26 +836,31 @@ async def get_sample(
 
     record = records[index]
 
-    # Compute loss segments
+    # Compute loss segments - check for messages format first
     loss_segments = []
 
-    # Add prompt segment (no loss)
-    prompt_text = record.get(dataset.prompt_field, "")
-    if prompt_text:
-        loss_segments.append(LossSegment(
-            field=dataset.prompt_field,
-            text=str(prompt_text),
-            computes_loss=False,
-        ))
+    if "messages" in record and isinstance(record["messages"], list):
+        # OpenAI messages format
+        loss_segments = _build_loss_segments_from_messages(record["messages"])
+    else:
+        # Simple prompt/response format
+        # Add prompt segment (no loss)
+        prompt_text = record.get(dataset.prompt_field, "")
+        if prompt_text:
+            loss_segments.append(LossSegment(
+                field=dataset.prompt_field,
+                text=str(prompt_text),
+                computes_loss=False,
+            ))
 
-    # Add response segment (with loss)
-    response_text = record.get(dataset.response_field, "")
-    if response_text:
-        loss_segments.append(LossSegment(
-            field=dataset.response_field,
-            text=str(response_text),
-            computes_loss=True,
-        ))
+        # Add response segment (with loss)
+        response_text = record.get(dataset.response_field, "")
+        if response_text:
+            loss_segments.append(LossSegment(
+                field=dataset.response_field,
+                text=str(response_text),
+                computes_loss=True,
+            ))
 
     # Get label values
     labels = {}
@@ -564,23 +910,38 @@ async def get_samples(
     for i, record in enumerate(paginated):
         actual_index = offset + i
 
-        # Compute loss segments
+        # Compute loss segments - check for messages format first
         loss_segments = []
-        prompt_text = record.get(dataset.prompt_field, "")
-        if prompt_text:
-            loss_segments.append(LossSegment(
-                field=dataset.prompt_field,
-                text=str(prompt_text)[:500] + ("..." if len(str(prompt_text)) > 500 else ""),
-                computes_loss=False,
-            ))
 
-        response_text = record.get(dataset.response_field, "")
-        if response_text:
-            loss_segments.append(LossSegment(
-                field=dataset.response_field,
-                text=str(response_text)[:500] + ("..." if len(str(response_text)) > 500 else ""),
-                computes_loss=True,
-            ))
+        if "messages" in record and isinstance(record["messages"], list):
+            # OpenAI messages format - truncate content for list view
+            for msg in record["messages"]:
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                truncated = content[:500] + ("..." if len(content) > 500 else "")
+
+                loss_segments.append(LossSegment(
+                    field=role,
+                    text=truncated,
+                    computes_loss=(role == "assistant"),
+                ))
+        else:
+            # Simple prompt/response format
+            prompt_text = record.get(dataset.prompt_field, "")
+            if prompt_text:
+                loss_segments.append(LossSegment(
+                    field=dataset.prompt_field,
+                    text=str(prompt_text)[:500] + ("..." if len(str(prompt_text)) > 500 else ""),
+                    computes_loss=False,
+                ))
+
+            response_text = record.get(dataset.response_field, "")
+            if response_text:
+                loss_segments.append(LossSegment(
+                    field=dataset.response_field,
+                    text=str(response_text)[:500] + ("..." if len(str(response_text)) > 500 else ""),
+                    computes_loss=True,
+                ))
 
         # Get label values
         labels = {}

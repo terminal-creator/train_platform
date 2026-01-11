@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api/v1',
-  timeout: 30000,
+  timeout: 10000,  // 10 seconds
   headers: {
     'Content-Type': 'application/json'
   }
@@ -80,7 +80,8 @@ export const getEvalDatasets = (params) => api.get('/evaluation/datasets', { par
 export const uploadEvalDataset = (formData, params) => {
   const queryParams = new URLSearchParams(params).toString()
   return api.post(`/evaluation/datasets/upload?${queryParams}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000  // 2 minutes for file upload
   })
 }
 export const getEvalDataset = (uuid) => api.get(`/evaluation/datasets/${uuid}`)
@@ -108,7 +109,8 @@ export const getTrainingDatasets = (params) => api.get('/training-datasets', { p
 export const uploadTrainingDataset = (formData, params) => {
   const queryParams = new URLSearchParams(params).toString()
   return api.post(`/training-datasets/upload?${queryParams}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000  // 2 minutes for file upload
   })
 }
 export const getTrainingDataset = (uuid) => api.get(`/training-datasets/${uuid}`)
@@ -129,6 +131,8 @@ export const syncTrainingDataset = (uuid, force = false) =>
   api.post(`/training-datasets/${uuid}/sync`, null, { params: { force } })
 export const syncAllTrainingDatasets = (force = false) =>
   api.post('/training-datasets/sync-all', null, { params: { force } })
+export const getTrainingDatasetStats = (uuid) => api.get(`/training-datasets/${uuid}/stats`)
+export const getTrainingDatasetQuality = (uuid) => api.get(`/training-datasets/${uuid}/quality-check`)
 
 // Run Mode Configuration
 export const getRunModeConfig = () => api.get('/run-mode/config')

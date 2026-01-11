@@ -20,7 +20,12 @@ import {
   CloudOff,
   Loader2,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Activity,
+  MessageSquare,
+  Hash,
+  AlertTriangle,
+  TrendingUp
 } from 'lucide-vue-next'
 
 const jobsStore = useJobsStore()
@@ -31,8 +36,13 @@ const currentSample = ref(null)
 const sampleIndex = ref(0)
 const distribution = ref([])
 const previewLoading = ref(false)
-const activeTab = ref('preview')
+const activeTab = ref('overview')  // 默认显示概览
 const showUploadModal = ref(false)
+
+// Stats and Quality
+const datasetStats = ref(null)
+const qualityCheck = ref(null)
+const statsLoading = ref(false)
 
 // Upload form
 const uploadForm = ref({
@@ -44,14 +54,17 @@ const uploadForm = ref({
 })
 const uploadFile = ref(null)
 const uploading = ref(false)
+const detectedFormat = ref(null)  // 'messages' or 'prompt_response' or null
+const detectedColumns = ref([])  // Detected columns from file
+const selectedLabelFields = ref([])  // Selected label fields
 const syncing = ref({})  // Track syncing status per dataset uuid
 
 const getSyncStatusInfo = (status) => {
   const statusMap = {
-    'synced': { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100', text: 'Synced' },
-    'syncing': { icon: Loader2, color: 'text-blue-500', bg: 'bg-blue-100', text: 'Syncing', spin: true },
-    'failed': { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-100', text: 'Failed' },
-    'not_synced': { icon: CloudOff, color: 'text-gray-400', bg: 'bg-gray-100', text: 'Not Synced' },
+    'synced': { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-100', text: '已同步' },
+    'syncing': { icon: Loader2, color: 'text-blue-500', bg: 'bg-blue-100', text: '同步中', spin: true },
+    'failed': { icon: AlertCircle, color: 'text-red-500', bg: 'bg-red-100', text: '同步失败' },
+    'not_synced': { icon: CloudOff, color: 'text-gray-400', bg: 'bg-gray-100', text: '未同步' },
   }
   return statusMap[status] || statusMap['not_synced']
 }
@@ -105,12 +118,62 @@ const fetchTrainingDatasets = async () => {
 
 const selectDataset = async (dataset) => {
   selectedDataset.value = dataset
-  activeTab.value = 'preview'
+  activeTab.value = 'overview'
   sampleIndex.value = 0
   distribution.value = []
   currentSample.value = null
-  await loadDistribution(dataset)
-  await loadSample(dataset, 0)
+  datasetStats.value = null
+  qualityCheck.value = null
+
+  // Load stats and quality in parallel
+  await Promise.all([
+    loadStats(dataset),
+    loadQuality(dataset),
+    loadDistribution(dataset),
+  ])
+}
+
+const loadStats = async (dataset) => {
+  statsLoading.value = true
+  try {
+    datasetStats.value = await api.getTrainingDatasetStats(dataset.uuid)
+  } catch (error) {
+    console.error('Failed to load stats:', error)
+  } finally {
+    statsLoading.value = false
+  }
+}
+
+const loadQuality = async (dataset) => {
+  try {
+    qualityCheck.value = await api.getTrainingDatasetQuality(dataset.uuid)
+  } catch (error) {
+    console.error('Failed to load quality:', error)
+  }
+}
+
+// Helper to get bar width percentage
+const getBarWidth = (value, distribution) => {
+  const max = Math.max(...Object.values(distribution))
+  return max > 0 ? (value / max) * 100 : 0
+}
+
+// Sort distribution keys in order
+const sortedDistKeys = (dist) => {
+  const order = ['0-50', '50-100', '100-200', '200-500', '500-1k', '1k-2k', '2k+', '1轮', '2轮', '3轮', '4-5轮', '6+轮']
+  return Object.keys(dist).sort((a, b) => {
+    const ia = order.indexOf(a)
+    const ib = order.indexOf(b)
+    if (ia !== -1 && ib !== -1) return ia - ib
+    return a.localeCompare(b)
+  })
+}
+
+// Quality score color
+const getQualityColor = (score) => {
+  if (score >= 90) return 'text-green-600'
+  if (score >= 70) return 'text-yellow-600'
+  return 'text-red-600'
 }
 
 const loadDistribution = async (dataset) => {
@@ -145,10 +208,67 @@ const nextSample = () => {
   }
 }
 
-const handleFileSelect = (e) => {
-  uploadFile.value = e.target.files[0]
-  if (uploadFile.value && !uploadForm.value.name) {
-    uploadForm.value.name = uploadFile.value.name.replace(/\.[^/.]+$/, '')
+const openUploadModal = () => {
+  // Reset form when opening modal
+  uploadForm.value = {
+    name: '',
+    description: '',
+    labelFields: '',
+    promptField: 'prompt',
+    responseField: 'response'
+  }
+  uploadFile.value = null
+  detectedFormat.value = null
+  detectedColumns.value = []
+  selectedLabelFields.value = []
+  showUploadModal.value = true
+}
+
+const handleFileSelect = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+
+  uploadFile.value = file
+  if (!uploadForm.value.name) {
+    uploadForm.value.name = file.name.replace(/\.[^/.]+$/, '')
+  }
+
+  // Auto-detect format and columns by reading first line
+  detectedFormat.value = null
+  detectedColumns.value = []
+  selectedLabelFields.value = []
+  try {
+    const text = await file.slice(0, 10000).text()  // Read first 10KB
+    const firstLine = text.split('\n')[0]
+    if (firstLine) {
+      const parsed = JSON.parse(firstLine)
+
+      // Detect all columns
+      const columns = Object.keys(parsed)
+
+      if (parsed.messages && Array.isArray(parsed.messages)) {
+        detectedFormat.value = 'messages'
+        // For messages format, exclude 'messages' from label field options
+        detectedColumns.value = columns.filter(c => c !== 'messages')
+      } else if (parsed.prompt !== undefined || parsed.response !== undefined) {
+        detectedFormat.value = 'prompt_response'
+        // Exclude prompt/response fields from label options
+        detectedColumns.value = columns.filter(c =>
+          c !== uploadForm.value.promptField && c !== uploadForm.value.responseField
+        )
+      } else {
+        // Unknown format, show all columns
+        detectedColumns.value = columns
+      }
+
+      // Auto-select common label fields
+      const commonLabels = ['domain', 'intent', 'category', 'type', 'difficulty', 'product', 'scenario']
+      selectedLabelFields.value = detectedColumns.value.filter(c =>
+        commonLabels.includes(c.toLowerCase())
+      )
+    }
+  } catch (err) {
+    console.warn('Could not detect format:', err)
   }
 }
 
@@ -166,14 +286,17 @@ const handleUpload = async () => {
       prompt_field: uploadForm.value.promptField,
       response_field: uploadForm.value.responseField
     }
-    if (uploadForm.value.labelFields) {
-      params.label_fields = uploadForm.value.labelFields
+    // Use selected label fields
+    if (selectedLabelFields.value.length > 0) {
+      params.label_fields = selectedLabelFields.value.join(',')
     }
 
     await api.uploadTrainingDataset(formData, params)
     showUploadModal.value = false
     uploadForm.value = { name: '', description: '', labelFields: '', promptField: 'prompt', responseField: 'response' }
     uploadFile.value = null
+    detectedColumns.value = []
+    selectedLabelFields.value = []
     await fetchTrainingDatasets()
   } catch (error) {
     console.error('Upload failed:', error)
@@ -215,38 +338,38 @@ onMounted(async () => {
     <!-- Header -->
     <div class="flex justify-between items-center mb-4">
       <div>
-        <h2 class="text-lg font-semibold text-gray-800">Training Datasets</h2>
-        <p class="text-xs text-gray-500">Manage training datasets with label distribution analysis</p>
+        <h2 class="text-lg font-semibold text-gray-800">训练数据集</h2>
+        <p class="text-xs text-gray-500">管理训练数据集，分析标签分布和数据质量</p>
       </div>
       <div class="flex gap-2">
         <button @click="fetchTrainingDatasets" :disabled="loading" class="btn-secondary flex items-center gap-1.5 text-xs">
           <RefreshCw :class="['w-3.5 h-3.5', loading && 'animate-spin']" />
-          Refresh
+          刷新
         </button>
-        <button @click="showUploadModal = true" class="btn-primary flex items-center gap-1.5 text-xs">
+        <button @click="openUploadModal" class="btn-primary flex items-center gap-1.5 text-xs">
           <Upload class="w-3.5 h-3.5" />
-          Upload
+          上传
         </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-12 gap-4">
-      <!-- Dataset List -->
-      <div class="col-span-4">
-        <div class="glass-card rounded-lg p-4">
+    <div class="grid grid-cols-12 gap-4" style="height: calc(100vh - 180px);">
+      <!-- Dataset List - Fixed -->
+      <div class="col-span-4 h-full">
+        <div class="glass-card rounded-lg p-4 h-full flex flex-col">
           <h3 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
             <Database class="w-4 h-4" />
-            Datasets
+            数据集列表
             <span class="text-2xs text-gray-400">({{ trainingDatasets.length }})</span>
           </h3>
 
           <div v-if="trainingDatasets.length === 0" class="text-center py-8">
             <Inbox class="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p class="text-sm text-gray-500">No datasets</p>
-            <p class="text-2xs text-gray-400 mt-1">Upload a training dataset to get started</p>
+            <p class="text-sm text-gray-500">暂无数据集</p>
+            <p class="text-2xs text-gray-400 mt-1">上传训练数据集开始使用</p>
           </div>
 
-          <div v-else class="space-y-2 max-h-[500px] overflow-y-auto">
+          <div v-else class="space-y-2 flex-1 overflow-y-auto">
             <div
               v-for="ds in trainingDatasets"
               :key="ds.uuid"
@@ -302,11 +425,11 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Dataset Details -->
-      <div class="col-span-8">
+      <!-- Dataset Details - Scrollable -->
+      <div class="col-span-8 h-full overflow-y-auto">
         <div v-if="!selectedDataset" class="glass-card rounded-lg p-8 text-center">
           <FileText class="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p class="text-gray-500">Select a dataset to view details</p>
+          <p class="text-gray-500">选择数据集查看详情</p>
         </div>
 
         <div v-else class="glass-card rounded-lg">
@@ -315,77 +438,269 @@ onMounted(async () => {
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="text-sm font-medium text-gray-800">{{ selectedDataset.name }}</h3>
-                <p class="text-2xs text-gray-500 mt-0.5">{{ selectedDataset.total_rows.toLocaleString() }} samples</p>
+                <p class="text-2xs text-gray-500 mt-0.5">{{ selectedDataset.total_rows.toLocaleString() }} 条样本</p>
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">
-                  Loss: <code class="bg-gray-100 px-1 rounded">{{ selectedDataset.response_field }}</code>
+                  损失字段: <code class="bg-gray-100 px-1 rounded">{{ selectedDataset.response_field }}</code>
                 </span>
               </div>
             </div>
           </div>
 
           <!-- Tabs -->
-          <div class="flex border-b border-gray-100">
+          <div class="flex border-b border-gray-100 overflow-x-auto">
             <button
-              @click="activeTab = 'preview'"
+              @click="activeTab = 'overview'"
               :class="[
-                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
-                activeTab === 'preview'
+                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+                activeTab === 'overview'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               ]"
             >
-              <Eye class="w-3.5 h-3.5 inline mr-1" />
-              Sample Viewer
+              <Activity class="w-3.5 h-3.5 inline mr-1" />
+              概览
             </button>
             <button
               @click="activeTab = 'distribution'"
               :class="[
-                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
                 activeTab === 'distribution'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               ]"
             >
               <PieChart class="w-3.5 h-3.5 inline mr-1" />
-              Distribution
+              标签分布
+            </button>
+            <button
+              @click="activeTab = 'quality'"
+              :class="[
+                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+                activeTab === 'quality'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              ]"
+            >
+              <AlertTriangle class="w-3.5 h-3.5 inline mr-1" />
+              质量检测
+              <span v-if="qualityCheck?.issues_found" class="ml-1 px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-2xs">
+                {{ qualityCheck.issues_found }}
+              </span>
+            </button>
+            <button
+              @click="activeTab = 'preview'; loadSample(selectedDataset, 0)"
+              :class="[
+                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+                activeTab === 'preview'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              ]"
+            >
+              <Eye class="w-3.5 h-3.5 inline mr-1" />
+              样本预览
             </button>
             <button
               @click="activeTab = 'settings'"
               :class="[
-                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                'px-4 py-2 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
                 activeTab === 'settings'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               ]"
             >
               <Settings class="w-3.5 h-3.5 inline mr-1" />
-              Settings
+              设置
             </button>
           </div>
 
           <!-- Content -->
           <div class="p-4">
+            <!-- Overview Tab -->
+            <div v-if="activeTab === 'overview'">
+              <div v-if="statsLoading" class="text-center py-8">
+                <RefreshCw class="w-6 h-6 text-gray-400 mx-auto mb-2 animate-spin" />
+                <p class="text-sm text-gray-500">加载统计数据...</p>
+              </div>
+
+              <div v-else-if="datasetStats" class="space-y-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-4 gap-3">
+                  <div class="bg-blue-50 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                      <Hash class="w-4 h-4 text-blue-500" />
+                      <span class="text-2xs text-blue-600">样本数</span>
+                    </div>
+                    <div class="text-xl font-semibold text-blue-700">{{ datasetStats.total_samples.toLocaleString() }}</div>
+                  </div>
+                  <div class="bg-purple-50 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                      <MessageSquare class="w-4 h-4 text-purple-500" />
+                      <span class="text-2xs text-purple-600">平均轮次</span>
+                    </div>
+                    <div class="text-xl font-semibold text-purple-700">{{ datasetStats.avg_turns }}</div>
+                  </div>
+                  <div class="bg-green-50 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                      <TrendingUp class="w-4 h-4 text-green-500" />
+                      <span class="text-2xs text-green-600">平均回复长度</span>
+                    </div>
+                    <div class="text-xl font-semibold text-green-700">{{ datasetStats.avg_response_chars }} 字</div>
+                  </div>
+                  <div class="bg-orange-50 rounded-lg p-3">
+                    <div class="flex items-center gap-2 mb-1">
+                      <CheckCircle2 class="w-4 h-4 text-orange-500" />
+                      <span class="text-2xs text-orange-600">质量得分</span>
+                    </div>
+                    <div :class="['text-xl font-semibold', getQualityColor(qualityCheck?.quality_score || 0)]">
+                      {{ qualityCheck?.quality_score || '-' }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Format Info -->
+                <div class="bg-gray-50 rounded-lg p-3">
+                  <div class="flex items-center gap-4 text-xs">
+                    <span class="text-gray-500">格式:</span>
+                    <span class="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                      {{ datasetStats.format_type === 'messages' ? 'OpenAI Messages' : 'Prompt/Response' }}
+                    </span>
+                    <span class="text-gray-500">System Prompt:</span>
+                    <span class="text-gray-700">{{ datasetStats.has_system_prompt }}%</span>
+                    <span class="text-gray-500">平均总长度:</span>
+                    <span class="text-gray-700">{{ datasetStats.avg_total_chars }} 字</span>
+                  </div>
+                </div>
+
+                <!-- Length Distribution -->
+                <div class="grid grid-cols-2 gap-4">
+                  <!-- Prompt Length -->
+                  <div class="bg-gray-50 rounded-lg p-4">
+                    <h4 class="text-xs font-medium text-gray-700 mb-3">Prompt 长度分布</h4>
+                    <div class="space-y-2">
+                      <div v-for="key in sortedDistKeys(datasetStats.prompt_length_distribution)" :key="key" class="flex items-center gap-2">
+                        <span class="text-2xs text-gray-500 w-12">{{ key }}</span>
+                        <div class="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            class="h-full bg-blue-500 rounded-full"
+                            :style="{ width: getBarWidth(datasetStats.prompt_length_distribution[key], datasetStats.prompt_length_distribution) + '%' }"
+                          />
+                        </div>
+                        <span class="text-2xs text-gray-600 w-10 text-right">{{ datasetStats.prompt_length_distribution[key] }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Response Length -->
+                  <div class="bg-gray-50 rounded-lg p-4">
+                    <h4 class="text-xs font-medium text-gray-700 mb-3">Response 长度分布</h4>
+                    <div class="space-y-2">
+                      <div v-for="key in sortedDistKeys(datasetStats.response_length_distribution)" :key="key" class="flex items-center gap-2">
+                        <span class="text-2xs text-gray-500 w-12">{{ key }}</span>
+                        <div class="flex-1 h-4 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            class="h-full bg-green-500 rounded-full"
+                            :style="{ width: getBarWidth(datasetStats.response_length_distribution[key], datasetStats.response_length_distribution) + '%' }"
+                          />
+                        </div>
+                        <span class="text-2xs text-gray-600 w-10 text-right">{{ datasetStats.response_length_distribution[key] }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Turns Distribution -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <h4 class="text-xs font-medium text-gray-700 mb-3">对话轮次分布</h4>
+                  <div class="flex gap-4">
+                    <div v-for="key in sortedDistKeys(datasetStats.turns_distribution)" :key="key" class="flex-1">
+                      <div class="text-center">
+                        <div class="h-20 flex items-end justify-center mb-1">
+                          <div
+                            class="w-8 bg-purple-500 rounded-t"
+                            :style="{ height: getBarWidth(datasetStats.turns_distribution[key], datasetStats.turns_distribution) + '%' }"
+                          />
+                        </div>
+                        <div class="text-2xs text-gray-600">{{ key }}</div>
+                        <div class="text-2xs text-gray-500">{{ datasetStats.turns_distribution[key] }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quality Tab -->
+            <div v-else-if="activeTab === 'quality'">
+              <div v-if="!qualityCheck" class="text-center py-8">
+                <RefreshCw class="w-6 h-6 text-gray-400 mx-auto mb-2 animate-spin" />
+                <p class="text-sm text-gray-500">检测中...</p>
+              </div>
+
+              <div v-else class="space-y-4">
+                <!-- Quality Score Card -->
+                <div class="bg-gray-50 rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <h4 class="text-sm font-medium text-gray-700">数据质量评分</h4>
+                    <p class="text-2xs text-gray-500 mt-0.5">基于空回复、短回复、重复等指标计算</p>
+                  </div>
+                  <div :class="['text-3xl font-bold', getQualityColor(qualityCheck.quality_score)]">
+                    {{ qualityCheck.quality_score }}
+                    <span class="text-sm font-normal text-gray-400">/ 100</span>
+                  </div>
+                </div>
+
+                <!-- Issues Summary -->
+                <div v-if="qualityCheck.issues.length === 0" class="bg-green-50 rounded-lg p-4 text-center">
+                  <CheckCircle2 class="w-8 h-8 text-green-500 mx-auto mb-2" />
+                  <p class="text-sm text-green-700">未发现质量问题</p>
+                  <p class="text-2xs text-green-600 mt-1">数据集质量良好，可以用于训练</p>
+                </div>
+
+                <div v-else class="space-y-3">
+                  <div
+                    v-for="issue in qualityCheck.issues"
+                    :key="issue.issue_type"
+                    class="bg-red-50 rounded-lg p-4 border border-red-100"
+                  >
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center gap-2">
+                        <AlertTriangle class="w-4 h-4 text-red-500" />
+                        <span class="text-sm font-medium text-red-700">{{ issue.issue_type }}</span>
+                      </div>
+                      <div class="text-right">
+                        <span class="text-sm font-semibold text-red-600">{{ issue.count }}</span>
+                        <span class="text-2xs text-red-500 ml-1">({{ issue.percentage }}%)</span>
+                      </div>
+                    </div>
+                    <div class="text-2xs text-red-600">
+                      问题样本索引: {{ issue.sample_indices.slice(0, 3).join(', ') }}{{ issue.sample_indices.length > 3 ? '...' : '' }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Sample Viewer Tab -->
-            <div v-if="activeTab === 'preview'">
+            <div v-else-if="activeTab === 'preview'">
               <!-- Navigation -->
               <div class="flex items-center justify-between mb-4">
                 <div class="flex items-center gap-2">
                   <button
                     @click="prevSample"
                     :disabled="sampleIndex === 0 || previewLoading"
-                    class="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50"
+                    class="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-600"
                   >
                     <ChevronLeft class="w-4 h-4" />
                   </button>
                   <span class="text-xs text-gray-600">
-                    Sample {{ sampleIndex + 1 }} of {{ selectedDataset.total_rows.toLocaleString() }}
+                    第 {{ sampleIndex + 1 }} / {{ selectedDataset.total_rows.toLocaleString() }} 条
                   </span>
                   <button
                     @click="nextSample"
                     :disabled="sampleIndex >= selectedDataset.total_rows - 1 || previewLoading"
-                    class="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50"
+                    class="p-1.5 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-600"
                   >
                     <ChevronRight class="w-4 h-4" />
                   </button>
@@ -404,23 +719,33 @@ onMounted(async () => {
               <!-- Loading -->
               <div v-if="previewLoading" class="text-center py-8">
                 <RefreshCw class="w-6 h-6 text-gray-400 mx-auto mb-2 animate-spin" />
-                <p class="text-sm text-gray-500">Loading...</p>
+                <p class="text-sm text-gray-500">加载中...</p>
               </div>
 
               <!-- Sample Content with Loss Highlighting -->
               <div v-else-if="currentSample" class="space-y-4">
                 <div
-                  v-for="segment in currentSample.loss_segments"
-                  :key="segment.field"
+                  v-for="(segment, idx) in currentSample.loss_segments"
+                  :key="idx"
                   :class="[
                     'p-3 rounded-lg border',
-                    segment.computes_loss
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-gray-50 border-gray-200'
+                    segment.field === 'system' ? 'bg-purple-50 border-purple-200' :
+                    segment.field === 'user' ? 'bg-blue-50 border-blue-200' :
+                    segment.field === 'assistant' ? 'bg-green-50 border-green-200' :
+                    segment.computes_loss ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
                   ]"
                 >
                   <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-medium text-gray-700">{{ segment.field }}</span>
+                    <span :class="[
+                      'text-xs font-medium',
+                      segment.field === 'system' ? 'text-purple-700' :
+                      segment.field === 'user' ? 'text-blue-700' :
+                      segment.field === 'assistant' ? 'text-green-700' : 'text-gray-700'
+                    ]">
+                      {{ segment.field === 'system' ? '🔧 System' :
+                         segment.field === 'user' ? '👤 User' :
+                         segment.field === 'assistant' ? '🤖 Assistant' : segment.field }}
+                    </span>
                     <span
                       :class="[
                         'px-1.5 py-0.5 rounded text-2xs',
@@ -429,7 +754,7 @@ onMounted(async () => {
                           : 'bg-gray-200 text-gray-600'
                       ]"
                     >
-                      {{ segment.computes_loss ? 'Computes Loss' : 'No Loss' }}
+                      {{ segment.computes_loss ? '计算损失' : '不计算损失' }}
                     </span>
                   </div>
                   <pre class="text-xs text-gray-700 whitespace-pre-wrap font-mono">{{ segment.text }}</pre>
@@ -441,8 +766,8 @@ onMounted(async () => {
             <div v-else-if="activeTab === 'distribution'">
               <div v-if="distribution.length === 0" class="text-center py-8">
                 <PieChart class="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p class="text-sm text-gray-500">No label fields configured</p>
-                <p class="text-2xs text-gray-400 mt-1">Configure label fields in Settings tab</p>
+                <p class="text-sm text-gray-500">未配置标签字段</p>
+                <p class="text-2xs text-gray-400 mt-1">在设置中配置标签字段</p>
               </div>
 
               <div v-else class="grid grid-cols-2 gap-4">
@@ -473,7 +798,7 @@ onMounted(async () => {
                     </div>
                   </div>
                   <div class="mt-3 pt-3 border-t border-gray-200 text-2xs text-gray-500">
-                    Total: {{ dist.total.toLocaleString() }} samples
+                    共 {{ dist.total.toLocaleString() }} 条 · {{ Object.keys(dist.distribution).length }} 个类别
                   </div>
                 </div>
               </div>
@@ -483,29 +808,29 @@ onMounted(async () => {
             <div v-else-if="activeTab === 'settings'">
               <div class="space-y-4">
                 <div class="bg-gray-50 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-gray-700 mb-3">Dataset Information</h4>
+                  <h4 class="text-sm font-medium text-gray-700 mb-3">数据集信息</h4>
                   <div class="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span class="text-gray-500">File:</span>
+                      <span class="text-gray-500">文件：</span>
                       <span class="ml-2 text-gray-700">{{ selectedDataset.file_path?.split('/').pop() }}</span>
                     </div>
                     <div>
-                      <span class="text-gray-500">Format:</span>
+                      <span class="text-gray-500">格式：</span>
                       <span class="ml-2 text-gray-700 uppercase">{{ selectedDataset.file_format }}</span>
                     </div>
                     <div>
-                      <span class="text-gray-500">Size:</span>
+                      <span class="text-gray-500">大小：</span>
                       <span class="ml-2 text-gray-700">{{ formatFileSize(selectedDataset.file_size_mb) }}</span>
                     </div>
                     <div>
-                      <span class="text-gray-500">Rows:</span>
+                      <span class="text-gray-500">样本数：</span>
                       <span class="ml-2 text-gray-700">{{ selectedDataset.total_rows.toLocaleString() }}</span>
                     </div>
                   </div>
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-gray-700 mb-3">Columns</h4>
+                  <h4 class="text-sm font-medium text-gray-700 mb-3">字段列表</h4>
                   <div class="flex flex-wrap gap-2">
                     <span
                       v-for="col in selectedDataset.columns"
@@ -519,32 +844,32 @@ onMounted(async () => {
                       ]"
                     >
                       {{ col }}
-                      <span v-if="col === selectedDataset.prompt_field" class="text-2xs">(prompt)</span>
-                      <span v-if="col === selectedDataset.response_field" class="text-2xs">(response/loss)</span>
-                      <span v-if="selectedDataset.label_fields?.includes(col)" class="text-2xs">(label)</span>
+                      <span v-if="col === selectedDataset.prompt_field" class="text-2xs">(输入)</span>
+                      <span v-if="col === selectedDataset.response_field" class="text-2xs">(输出/损失)</span>
+                      <span v-if="selectedDataset.label_fields?.includes(col)" class="text-2xs">(标签)</span>
                     </span>
                   </div>
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-gray-700 mb-3">Loss Computation</h4>
+                  <h4 class="text-sm font-medium text-gray-700 mb-3">损失计算配置</h4>
                   <div class="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <span class="text-gray-500">Prompt Field:</span>
+                      <span class="text-gray-500">输入字段：</span>
                       <code class="ml-2 px-1.5 py-0.5 bg-gray-200 rounded">{{ selectedDataset.prompt_field }}</code>
                     </div>
                     <div>
-                      <span class="text-gray-500">Response Field:</span>
+                      <span class="text-gray-500">输出字段：</span>
                       <code class="ml-2 px-1.5 py-0.5 bg-green-100 rounded text-green-700">{{ selectedDataset.response_field }}</code>
                     </div>
                   </div>
                   <p class="text-2xs text-gray-500 mt-2">
-                    Loss is computed only on the response field during training.
+                    训练时仅在输出字段上计算损失
                   </p>
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-gray-700 mb-3">Label Fields</h4>
+                  <h4 class="text-sm font-medium text-gray-700 mb-3">标签字段</h4>
                   <div v-if="selectedDataset.label_fields?.length > 0" class="flex flex-wrap gap-2">
                     <span
                       v-for="field in selectedDataset.label_fields"
@@ -554,18 +879,18 @@ onMounted(async () => {
                       {{ field }}
                     </span>
                   </div>
-                  <p v-else class="text-xs text-gray-500">No label fields configured</p>
+                  <p v-else class="text-xs text-gray-500">未配置标签字段</p>
                 </div>
 
                 <!-- Remote Sync Status -->
                 <div class="bg-gray-50 rounded-lg p-4">
                   <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
                     <Cloud class="w-4 h-4" />
-                    Remote Sync Status
+                    远程同步状态
                   </h4>
                   <div class="space-y-3">
                     <div class="flex items-center gap-2">
-                      <span class="text-xs text-gray-500">Status:</span>
+                      <span class="text-xs text-gray-500">状态：</span>
                       <span
                         :class="[
                           'flex items-center gap-1 px-2 py-0.5 rounded text-xs',
@@ -582,19 +907,19 @@ onMounted(async () => {
                     </div>
 
                     <div v-if="selectedDataset.remote_path" class="text-xs">
-                      <span class="text-gray-500">Remote Path:</span>
+                      <span class="text-gray-500">远程路径：</span>
                       <code class="ml-2 px-1.5 py-0.5 bg-gray-200 rounded text-gray-700 break-all">
                         {{ selectedDataset.remote_path }}
                       </code>
                     </div>
 
                     <div v-if="selectedDataset.sync_error" class="text-xs">
-                      <span class="text-gray-500">Error:</span>
+                      <span class="text-gray-500">错误：</span>
                       <span class="ml-2 text-red-600">{{ selectedDataset.sync_error }}</span>
                     </div>
 
                     <div v-if="selectedDataset.synced_at" class="text-xs">
-                      <span class="text-gray-500">Last Synced:</span>
+                      <span class="text-gray-500">上次同步：</span>
                       <span class="ml-2 text-gray-700">{{ new Date(selectedDataset.synced_at).toLocaleString() }}</span>
                     </div>
 
@@ -606,10 +931,10 @@ onMounted(async () => {
                       >
                         <Loader2 v-if="syncing[selectedDataset.uuid]" class="w-3.5 h-3.5 animate-spin" />
                         <Cloud v-else class="w-3.5 h-3.5" />
-                        {{ syncing[selectedDataset.uuid] ? 'Syncing...' : (selectedDataset.sync_status === 'synced' ? 'Re-sync to Remote' : 'Sync to Remote') }}
+                        {{ syncing[selectedDataset.uuid] ? '同步中...' : (selectedDataset.sync_status === 'synced' ? '重新同步' : '同步到远程') }}
                       </button>
                       <p class="text-2xs text-gray-400 mt-1.5">
-                        Sync this dataset to the remote SSH server for training.
+                        将数据集同步到远程 SSH 服务器用于训练
                       </p>
                     </div>
                   </div>
@@ -624,69 +949,104 @@ onMounted(async () => {
     <!-- Upload Modal -->
     <div v-if="showUploadModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Upload Training Dataset</h3>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">上传训练数据集</h3>
 
         <div class="space-y-4">
           <div>
-            <label class="block text-xs text-gray-600 mb-1">File (JSONL, JSON, Parquet)</label>
-            <input
-              type="file"
-              accept=".jsonl,.json,.parquet,.ndjson"
-              @change="handleFileSelect"
-              class="w-full text-xs"
-            />
+            <label class="block text-xs text-gray-600 mb-1">文件 (JSONL, JSON, Parquet)</label>
+            <div class="flex items-center gap-2">
+              <label class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded cursor-pointer text-xs text-gray-700 border border-gray-300">
+                选择文件
+                <input
+                  type="file"
+                  accept=".jsonl,.json,.parquet,.ndjson"
+                  @change="handleFileSelect"
+                  class="hidden"
+                />
+              </label>
+              <span v-if="uploadFile" class="text-xs text-green-600 flex items-center gap-1">
+                <CheckCircle2 class="w-3.5 h-3.5" />
+                {{ uploadFile.name }}
+              </span>
+              <span v-else class="text-xs text-gray-400">未选择文件</span>
+            </div>
           </div>
 
           <div>
-            <label class="block text-xs text-gray-600 mb-1">Name *</label>
+            <label class="block text-xs text-gray-600 mb-1">名称 *</label>
             <input
               v-model="uploadForm.name"
               type="text"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Dataset name"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="数据集名称"
             />
           </div>
 
           <div>
-            <label class="block text-xs text-gray-600 mb-1">Description</label>
+            <label class="block text-xs text-gray-600 mb-1">描述</label>
             <textarea
               v-model="uploadForm.description"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
               rows="2"
-              placeholder="Optional description"
+              placeholder="可选描述"
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <!-- Format Detection Notice -->
+          <div v-if="detectedFormat" class="p-3 rounded-lg" :class="detectedFormat === 'messages' ? 'bg-purple-50 border border-purple-200' : 'bg-blue-50 border border-blue-200'">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium" :class="detectedFormat === 'messages' ? 'text-purple-700' : 'text-blue-700'">
+                {{ detectedFormat === 'messages' ? '✅ 检测到 OpenAI Messages 格式' : '✅ 检测到 Prompt/Response 格式' }}
+              </span>
+            </div>
+            <p class="text-2xs mt-1" :class="detectedFormat === 'messages' ? 'text-purple-600' : 'text-blue-600'">
+              {{ detectedFormat === 'messages' ? '支持多轮对话，自动识别 system/user/assistant 角色' : '单轮对话格式' }}
+            </p>
+          </div>
+
+          <!-- Prompt/Response fields - only show for non-messages format -->
+          <div v-if="detectedFormat !== 'messages'" class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs text-gray-600 mb-1">Prompt Field</label>
+              <label class="block text-xs text-gray-600 mb-1">输入字段名</label>
               <input
                 v-model="uploadForm.promptField"
                 type="text"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="prompt"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="text-2xs text-gray-400 mt-0.5">数据中 prompt 字段名</p>
             </div>
             <div>
-              <label class="block text-xs text-gray-600 mb-1">Response Field</label>
+              <label class="block text-xs text-gray-600 mb-1">输出字段名</label>
               <input
                 v-model="uploadForm.responseField"
                 type="text"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="response"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              <p class="text-2xs text-gray-400 mt-0.5">数据中 response 字段名</p>
             </div>
           </div>
 
           <div>
-            <label class="block text-xs text-gray-600 mb-1">Label Fields (comma-separated, optional)</label>
-            <input
-              v-model="uploadForm.labelFields"
-              type="text"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="e.g., tenant, category"
-            />
-            <p class="text-2xs text-gray-400 mt-1">Leave empty to auto-detect</p>
+            <label class="block text-xs text-gray-600 mb-1">标签字段（用于分布分析）</label>
+            <div v-if="detectedColumns.length > 0" class="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <label
+                v-for="col in detectedColumns"
+                :key="col"
+                class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors"
+                :class="selectedLabelFields.includes(col) ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-600 hover:bg-gray-100'"
+              >
+                <input
+                  type="checkbox"
+                  :value="col"
+                  v-model="selectedLabelFields"
+                  class="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                />
+                <span class="text-xs">{{ col }}</span>
+              </label>
+            </div>
+            <p v-else class="text-2xs text-gray-400 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              请先选择文件，将自动检测可用的标签字段
+            </p>
           </div>
         </div>
 
@@ -695,14 +1055,14 @@ onMounted(async () => {
             @click="showUploadModal = false"
             class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
           >
-            Cancel
+            取消
           </button>
           <button
             @click="handleUpload"
             :disabled="uploading || !uploadFile || !uploadForm.name"
             class="btn-primary text-sm"
           >
-            {{ uploading ? 'Uploading...' : 'Upload' }}
+            {{ uploading ? '上传中...' : '上传' }}
           </button>
         </div>
       </div>

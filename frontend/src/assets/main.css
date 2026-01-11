@@ -27,6 +27,10 @@
     @apply transition-colors placeholder-gray-400;
   }
 
+  .input-light option {
+    @apply text-gray-800 bg-white;
+  }
+
   .btn-primary {
     @apply bg-primary-600 text-white font-medium text-sm;
     @apply px-4 py-2 rounded-md;
