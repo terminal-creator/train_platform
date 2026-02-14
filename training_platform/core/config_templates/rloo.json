@@ -1,0 +1,35 @@
+{
+  "name": "RLOO - Reinforcement Learning Leave-One-Out",
+  "description": "强化学习留一法训练配置模板。通过留一法估计baseline进行策略优化。",
+  "category": "reinforcement_learning",
+  "algorithm": "rloo",
+  "verl_module": "verl.trainer.main_ppo",
+  "verl_adv_estimator": "rloo",
+  "required_fields": ["model_path", "train_data_path"],
+  "data_format": {
+    "type": "prompt-only",
+    "required_columns": ["prompt"],
+    "optional_columns": ["data_source"],
+    "description": "每条数据包含prompt字段"
+  },
+  "defaults": {
+    "num_epochs": 3,
+    "learning_rate": 1e-6,
+    "batch_size": 256,
+    "micro_batch_size": 4,
+    "max_prompt_length": 512,
+    "max_response_length": 1024,
+    "rollout_n": 4,
+    "kl_coef": 0.001,
+    "use_kl_loss": true,
+    "lora_enabled": false
+  },
+  "parameter_ranges": {
+    "learning_rate": {"min": 1e-8, "max": 1e-4, "recommended": 1e-6},
+    "rollout_n": {"min": 2, "max": 32, "recommended": 4}
+  },
+  "tips": [
+    "RLOO需要每个prompt生成多个response（rollout_n >= 2）",
+    "使用留一法估计baseline，不需要单独的critic model"
+  ]
+}

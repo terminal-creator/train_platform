@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LLM Training Platform built on the [verl](https://github.com/volcengine/verl) framework. Provides training job management, compute configuration optimization, model surgery, and real-time monitoring for SFT, PPO, GRPO, DPO, and GSPO training algorithms.
 
-**Current Version**: v1.0.0 (Phase 1 in progress)
+**Current Version**: v1.1.0 (feature-driven development, see feature_list.json)
 **verl Version**: b12eb3b (v0.7.0-23) - included as git submodule in `environments/verl`
 
 ## Development Commands
@@ -135,6 +135,77 @@ Use small models for testing:
 - Dataset: 100-1000 samples in `datasets/` directory
 - Test both Local and SSH modes
 
-## Common Tasks Reference
 
-See `TASKS.md` for detailed development roadmap (Phase 0 completed, Phase 1 in progress).
+
+## MANDATORY: Agent Workflow
+
+Every new agent session MUST follow this workflow:
+
+### Step 1: Initialize Environment
+
+```bash
+./init.sh
+```
+
+This will:
+- Install all dependencies
+- Start the development server at http://localhost:3001
+
+**DO NOT skip this step.** Ensure the server is running before proceeding.
+
+### Step 2: Select Next Task
+
+Read `feature_list.json` and select ONE task to work on.
+
+Selection criteria (in order of priority):
+1. Choose a task where `passes: false`
+2. Consider dependencies — fundamental features should be done first
+3. Pick the highest-priority incomplete task
+
+### Step 3: Implement the Task
+
+- Read the task description and steps carefully
+- Implement the functionality to satisfy all steps
+- Follow existing code patterns and conventions
+
+### Step 4: Test Thoroughly
+
+After implementation, verify ALL steps in the task:
+- Write unit tests if applicable
+- Use browser testing for UI features (MCP Puppeteer tools)这一步需要用mcp工具
+- Run `cd frontend && npm run build` to verify zero TypeScript errors
+- Fix any errors before proceeding
+
+### Step 5: Update Progress
+
+1. Only change `"passes": false` → `"passes": true` in `feature_list.json` after **verified** testing
+2. Append a progress entry to `claude-progress.txt` with the following format:
+
+```
+## [Date] — Task: [task description]
+- What was done
+- Current state
+- Known issues
+- Next priority
+```
+
+- It is **unacceptable** to remove or edit existing feature descriptions in `feature_list.json` — only change the `passes` field
+
+### Step 6: Git Commit
+
+After updating progress, commit your changes:
+- Stage all relevant changed files
+- Write a clear commit message describing the feature implemented
+- Do NOT push to remote unless explicitly asked
+提交到self-sop这个分支
+
+### Key Rules
+- Never declare the project "done" — always check `feature_list.json` for remaining `passes: false` items
+- If you find a bug in an existing feature, fix it before starting new work
+- Leave the codebase in a clean, working state at the end of every session
+- If a feature cannot be completed in one session, document progress in `claude-progress.txt` and leave the code compilable
+- 在需要的地方都打上log可以帮助你进行debug
+- Work on **one feature at a time** — do not attempt multiple features in a single session
+- 如果需要人工协助，比如申请apikey等，可以停下来找我，但是只有在必要的情况下，在test.md 里面有autodl链接的ssh和qwen-max的apikey，在autodl里面有下载好的model
+
+过程你可以用英文确保准确率，告诉我结果和与我交流的时候用中文

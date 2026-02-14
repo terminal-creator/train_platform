@@ -106,11 +106,15 @@ export const deleteComparison = (uuid) => api.delete(`/evaluation/comparisons/${
 
 // Training Datasets
 export const getTrainingDatasets = (params) => api.get('/training-datasets', { params })
-export const uploadTrainingDataset = (formData, params) => {
+export const uploadTrainingDataset = (formData, params, onProgress) => {
   const queryParams = new URLSearchParams(params).toString()
   return api.post(`/training-datasets/upload?${queryParams}`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 120000  // 2 minutes for file upload
+    timeout: 120000,  // 2 minutes for file upload
+    onUploadProgress: onProgress ? (e) => {
+      const percent = Math.round((e.loaded * 100) / e.total)
+      onProgress(percent)
+    } : undefined
   })
 }
 export const getTrainingDataset = (uuid) => api.get(`/training-datasets/${uuid}`)
@@ -144,6 +148,23 @@ export const getSSHGpuInfo = (config) => api.post('/run-mode/ssh/gpu-info', conf
 export const getRunnerStatus = () => api.get('/run-mode/status')
 export const getRemoteModels = () => api.get('/run-mode/remote/models')
 export const getRemoteDatasets = () => api.get('/run-mode/remote/datasets')
+
+// Data Factory
+export const getConfigTemplates = () => api.get('/data-factory/templates')
+export const getConfigTemplate = (algorithm) => api.get(`/data-factory/templates/${algorithm}`)
+export const validateConfig = (algorithm, config) => api.post(`/data-factory/templates/${algorithm}/validate`, config)
+export const detectFormat = (inputPath) => api.post('/data-factory/detect-format', { input_path: inputPath })
+export const convertFormat = (data) => api.post('/data-factory/convert', data)
+export const cleanData = (data) => api.post('/data-factory/clean', data, { timeout: 120000 })
+export const deduplicateData = (data) => api.post('/data-factory/deduplicate', data, { timeout: 120000 })
+export const assessQuality = (data) => api.post('/data-factory/assess-quality', data, { timeout: 120000 })
+export const splitData = (data) => api.post('/data-factory/split', data, { timeout: 120000 })
+
+// Benchmarks
+export const getBenchmarks = () => api.get('/data-factory/benchmarks')
+export const getBenchmarkQuestions = (benchmark, params) => api.get(`/data-factory/benchmarks/${benchmark}/questions`, { params })
+export const evaluateBenchmark = (benchmark, data, params) => api.post(`/data-factory/benchmarks/${benchmark}/evaluate`, data, { params })
+export const generateEvalReport = (data) => api.post('/data-factory/benchmarks/report', data)
 
 // WebSocket for live metrics (using enhanced WebSocket utility)
 import {

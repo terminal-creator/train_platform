@@ -1,0 +1,38 @@
+{
+  "name": "DAPO - Decoupled Alignment Policy Optimization",
+  "description": "解耦对齐策略优化训练配置模板。通过解耦KL约束实现更高效的对齐。",
+  "category": "reinforcement_learning",
+  "algorithm": "dapo",
+  "verl_module": "verl.trainer.main_ppo",
+  "verl_adv_estimator": "grpo",
+  "required_fields": ["model_path", "train_data_path"],
+  "data_format": {
+    "type": "prompt-only",
+    "required_columns": ["prompt"],
+    "optional_columns": ["data_source", "solution"],
+    "description": "每条数据包含prompt字段"
+  },
+  "defaults": {
+    "num_epochs": 3,
+    "learning_rate": 1e-6,
+    "batch_size": 256,
+    "micro_batch_size": 4,
+    "max_prompt_length": 512,
+    "max_response_length": 2048,
+    "rollout_n": 16,
+    "kl_coef": 0.0,
+    "entropy_coef": 0.0,
+    "clip_ratio": 0.2,
+    "use_kl_loss": false,
+    "lora_enabled": false
+  },
+  "parameter_ranges": {
+    "learning_rate": {"min": 1e-8, "max": 1e-4, "recommended": 1e-6},
+    "rollout_n": {"min": 4, "max": 64, "recommended": 16}
+  },
+  "tips": [
+    "DAPO去除了KL约束，使用clip和entropy控制策略更新",
+    "在AIME 2024上达到50分的SOTA (Qwen2.5-32B)",
+    "较大的rollout_n（如16-64）有助于更好的效果"
+  ]
+}

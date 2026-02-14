@@ -3,6 +3,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/',
+    name: 'landing',
+    component: () => import('@/views/LandingView.vue'),
+    meta: { layout: 'blank' }
+  },
+  {
+    path: '/dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue')
   },
@@ -67,6 +73,28 @@ const routes = [
     path: '/tasks',
     name: 'tasks',
     component: () => import('@/views/TaskMonitor.vue')
+  },
+  // Data Factory
+  {
+    path: '/data-factory',
+    name: 'data-factory',
+    component: () => import('@/views/DataFactoryView.vue')
+  },
+  // Blog and Resume
+  {
+    path: '/blog',
+    name: 'blog',
+    component: () => import('@/views/BlogView.vue')
+  },
+  {
+    path: '/blog/:postId',
+    name: 'blog-post',
+    component: () => import('@/views/BlogView.vue')
+  },
+  {
+    path: '/resume',
+    name: 'resume',
+    component: () => import('@/views/ResumeView.vue')
   }
 ]
 

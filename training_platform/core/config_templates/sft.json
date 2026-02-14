@@ -1,0 +1,39 @@
+{
+  "name": "SFT - Supervised Fine-Tuning",
+  "description": "监督微调训练配置模板。使用标注数据对预训练模型进行微调。",
+  "category": "supervised",
+  "algorithm": "sft",
+  "verl_module": "verl.trainer.fsdp_sft_trainer",
+  "required_fields": ["model_path", "train_data_path"],
+  "data_format": {
+    "type": "prompt-response",
+    "required_columns": ["prompt", "response"],
+    "optional_columns": ["system"],
+    "description": "每条数据包含prompt和response字段"
+  },
+  "defaults": {
+    "num_epochs": 3,
+    "learning_rate": 2e-5,
+    "batch_size": 16,
+    "micro_batch_size": 4,
+    "max_length": 2048,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "gradient_accumulation_steps": 4,
+    "lora_enabled": false,
+    "lora_rank": 8,
+    "lora_alpha": 16,
+    "activation_checkpointing": true
+  },
+  "parameter_ranges": {
+    "learning_rate": {"min": 1e-7, "max": 1e-3, "recommended": 2e-5},
+    "batch_size": {"min": 1, "max": 512, "recommended": 16},
+    "num_epochs": {"min": 1, "max": 100, "recommended": 3},
+    "lora_rank": {"min": 4, "max": 256, "recommended": 8}
+  },
+  "tips": [
+    "SFT通常使用较高的学习率(1e-5 ~ 5e-5)",
+    "数据量较少时建议使用LoRA以防止过拟合",
+    "建议先在小数据集上测试配置是否正确"
+  ]
+}

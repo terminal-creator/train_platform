@@ -32,7 +32,12 @@ from .routers.dataset_version import router as dataset_version_router
 from .routers.experience import router as experience_router
 from .routers.pipelines import router as pipelines_router
 from .routers.celery_tasks_api import router as celery_tasks_router
+from .routers.blog import router as blog_router
+from .routers.data_factory import router as data_factory_router
 from ..core.database import init_db
+from ..demo.api import router as demo_router
+from ..demo.config import is_demo_mode, get_demo_settings
+from ..demo.middleware import DemoModeMiddleware
 from .auth import ApiKeyAuthMiddleware, create_default_api_key
 from .errors import register_error_handlers
 
@@ -148,6 +153,13 @@ if auth_enabled:
 else:
     logger.warning("API Key authentication DISABLED (development mode)")
 
+# Add Demo Mode middleware
+# Set TRAIN_PLATFORM_DEMO_MODE=true to enable demo mode
+app.add_middleware(DemoModeMiddleware)
+demo_mode_enabled = os.getenv("TRAIN_PLATFORM_DEMO_MODE", "false").lower() == "true"
+if demo_mode_enabled:
+    logger.info("Demo mode ENABLED - API will return mock data")
+
 
 # Request timing middleware
 @app.middleware("http")
@@ -178,6 +190,9 @@ app.include_router(dataset_version_router, prefix="/api/v1")  # Phase 2: Data ve
 app.include_router(experience_router, prefix="/api/v1")  # Phase 2: Experience reuse
 app.include_router(pipelines_router, prefix="/api/v1")  # Phase 3: Pipelines
 app.include_router(celery_tasks_router, prefix="/api/v1")  # Phase 3: Celery tasks
+app.include_router(demo_router, prefix="/api/v1")  # Demo Mode API
+app.include_router(blog_router, prefix="/api/v1")  # Blog posts
+app.include_router(data_factory_router, prefix="/api/v1")  # Data Factory
 
 # Import dataset router (optional - requires Milvus)
 try:
@@ -210,6 +225,8 @@ async def root():
             "experience": "/api/v1/experience",
             "pipelines": "/api/v1/pipelines",
             "celery_tasks": "/api/v1/celery-tasks",
+            "demo": "/api/v1/demo",
+            "data_factory": "/api/v1/data-factory",
         },
     }
 

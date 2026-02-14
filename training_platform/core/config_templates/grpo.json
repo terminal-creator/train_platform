@@ -1,0 +1,59 @@
+{
+  "name": "GRPO - Group Relative Policy Optimization",
+  "description": "组相对策略优化训练配置模板。verl核心算法，常用于数学推理场景。",
+  "category": "reinforcement_learning",
+  "algorithm": "grpo",
+  "verl_module": "verl.trainer.main_ppo",
+  "verl_adv_estimator": "grpo",
+  "required_fields": ["model_path", "train_data_path"],
+  "data_format": {
+    "type": "prompt-only",
+    "required_columns": ["prompt"],
+    "optional_columns": ["data_source", "solution", "answer"],
+    "description": "每条数据包含prompt字段，可选ground truth用于reward计算"
+  },
+  "reward_functions": [
+    {
+      "type": "math_verify",
+      "description": "数学验证奖励函数，比较模型答案与标准答案",
+      "extract_methods": ["boxed", "last_number", "json"],
+      "compare_methods": ["exact", "numeric", "fuzzy"]
+    },
+    {
+      "type": "format_check",
+      "description": "格式检查奖励函数，验证输出格式是否符合要求"
+    },
+    {
+      "type": "custom",
+      "description": "自定义奖励函数脚本"
+    }
+  ],
+  "defaults": {
+    "num_epochs": 3,
+    "learning_rate": 1e-6,
+    "batch_size": 256,
+    "micro_batch_size": 4,
+    "max_prompt_length": 512,
+    "max_response_length": 1024,
+    "rollout_n": 5,
+    "kl_coef": 0.001,
+    "entropy_coef": 0.0,
+    "use_kl_loss": true,
+    "reward_fn_type": "math_verify",
+    "reward_fn_extract_answer": "boxed",
+    "reward_fn_compare_method": "exact",
+    "gpu_memory_utilization": 0.6,
+    "lora_enabled": false
+  },
+  "parameter_ranges": {
+    "learning_rate": {"min": 1e-8, "max": 1e-4, "recommended": 1e-6},
+    "batch_size": {"min": 16, "max": 1024, "recommended": 256},
+    "rollout_n": {"min": 1, "max": 32, "recommended": 5},
+    "kl_coef": {"min": 0.0, "max": 1.0, "recommended": 0.001}
+  },
+  "tips": [
+    "GRPO不需要单独的reward model，使用rule-based reward",
+    "rollout_n控制每个prompt生成的响应数量，影响训练效果和速度",
+    "kl_coef越大，模型越接近原始策略，越小则允许更大偏移"
+  ]
+}

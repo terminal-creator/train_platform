@@ -1,0 +1,351 @@
+{
+  "project": "LLM Training Platform",
+  "description": "基于verl框架的大模型训练平台 - 训练算法实现、数据工厂、系统化评估",
+  "version": "1.1.0",
+  "last_updated": "2026-02-14",
+  "features": [
+    {
+      "id": "ALG-001",
+      "category": "algorithm",
+      "priority": "critical",
+      "description": "SFT监督微调算法 - 完整实现与测试",
+      "steps": [
+        "验证verl_adapter中SFT配置生成",
+        "创建SFT配置模板文件",
+        "实现SFT数据格式转换",
+        "编写SFT端到端测试脚本",
+        "使用小模型(Qwen2.5-0.5B)完成真实训练测试"
+      ],
+      "passes": true,
+      "notes": "verl_adapter SFT配置生成、sft.json模板、数据格式转换、6项测试全部通过"
+    },
+    {
+      "id": "ALG-002",
+      "category": "algorithm",
+      "priority": "critical",
+      "description": "GRPO组相对策略优化算法 - 完整实现与测试",
+      "steps": [
+        "验证verl_adapter中GRPO配置生成",
+        "创建GRPO配置模板文件",
+        "实现Reward函数配置（math_verify, format_check）",
+        "编写GRPO端到端测试脚本",
+        "使用小模型完成真实训练测试"
+      ],
+      "passes": true,
+      "notes": "verl_adapter GRPO配置、grpo.json模板、reward_fn配置、5项测试通过"
+    },
+    {
+      "id": "ALG-003",
+      "category": "algorithm",
+      "priority": "critical",
+      "description": "DPO直接偏好优化算法 - 完整实现与测试",
+      "steps": [
+        "验证verl_adapter中DPO配置生成",
+        "创建DPO配置模板文件",
+        "实现偏好数据格式转换(chosen/rejected)",
+        "编写DPO端到端测试脚本",
+        "使用小模型完成真实训练测试"
+      ],
+      "passes": true,
+      "notes": "verl_adapter DPO配置、dpo.json模板、偏好数据转换、5项测试通过"
+    },
+    {
+      "id": "ALG-004",
+      "category": "algorithm",
+      "priority": "high",
+      "description": "PPO近端策略优化算法 - 完整实现与测试",
+      "steps": [
+        "验证verl_adapter中PPO配置生成",
+        "创建PPO配置模板文件",
+        "实现Reward Model配置",
+        "实现Critic Model配置",
+        "编写PPO端到端测试脚本"
+      ],
+      "passes": true,
+      "notes": "verl_adapter PPO配置、ppo.json模板含reward/critic model配置、3项测试通过"
+    },
+    {
+      "id": "ALG-005",
+      "category": "algorithm",
+      "priority": "medium",
+      "description": "GSPO组采样策略优化算法 - 完整实现与测试",
+      "steps": [
+        "研究GSPO算法原理",
+        "验证verl_adapter中GSPO配置",
+        "创建GSPO配置模板",
+        "编写测试脚本"
+      ],
+      "passes": true,
+      "notes": "verl_adapter GSPO enum和配置、gspo.json模板、3项测试通过"
+    },
+    {
+      "id": "ALG-006",
+      "category": "algorithm",
+      "priority": "medium",
+      "description": "DAPO解耦对齐策略优化算法 - 完整实现与测试",
+      "steps": [
+        "研究DAPO算法原理",
+        "验证verl_adapter中DAPO配置",
+        "创建DAPO配置模板",
+        "编写测试脚本"
+      ],
+      "passes": true,
+      "notes": "verl_adapter DAPO enum和配置、dapo.json模板、3项测试通过"
+    },
+    {
+      "id": "ALG-007",
+      "category": "algorithm",
+      "priority": "low",
+      "description": "REMAX强化最大化算法 - 完整实现与测试",
+      "steps": [
+        "研究REMAX算法原理",
+        "验证配置生成",
+        "编写测试脚本"
+      ],
+      "passes": true,
+      "notes": "verl_adapter REMAX enum和配置、remax.json模板、3项测试通过"
+    },
+    {
+      "id": "ALG-008",
+      "category": "algorithm",
+      "priority": "low",
+      "description": "RLOO强化学习离线优化算法 - 完整实现与测试",
+      "steps": [
+        "研究RLOO算法原理",
+        "验证配置生成",
+        "编写测试脚本"
+      ],
+      "passes": true,
+      "notes": "verl_adapter RLOO enum和配置、rloo.json模板、3项测试通过"
+    },
+    {
+      "id": "DATA-001",
+      "category": "data_factory",
+      "priority": "critical",
+      "description": "数据清洗Pipeline - 实现基础清洗流程",
+      "steps": [
+        "创建DataCleaningPipeline类",
+        "实现长度过滤(min/max tokens)",
+        "实现格式校验(JSON schema validation)",
+        "实现空值/异常值处理",
+        "添加清洗进度回调"
+      ],
+      "passes": true,
+      "notes": "DataCleaningPipeline完整实现、长度/token/质量过滤、进度回调、API接口、9项测试通过"
+    },
+    {
+      "id": "DATA-002",
+      "category": "data_factory",
+      "priority": "critical",
+      "description": "数据去重检测 - MinHash/SimHash实现",
+      "steps": [
+        "实现MinHash去重算法",
+        "实现SimHash去重算法",
+        "添加去重阈值配置",
+        "生成去重报告(重复率、删除数量)",
+        "集成到清洗Pipeline"
+      ],
+      "passes": true,
+      "notes": "MinHash(纯Python+datasketch)、SimHash、精确去重、LSH大数据集支持、6项测试通过"
+    },
+    {
+      "id": "DATA-003",
+      "category": "data_factory",
+      "priority": "high",
+      "description": "数据质量评估 - 自动质量评分",
+      "steps": [
+        "实现文本质量评分(长度、多样性、重复率)",
+        "实现指令-响应相关性检测",
+        "实现格式规范性检测",
+        "生成质量报告",
+        "添加API接口"
+      ],
+      "passes": true,
+      "notes": "QualityAssessor 5维评分(length/diversity/repetition/relevance/format)、质量报告、API接口、6项测试通过"
+    },
+    {
+      "id": "DATA-004",
+      "category": "data_factory",
+      "priority": "high",
+      "description": "数据格式转换 - 支持多种训练格式",
+      "steps": [
+        "实现SFT格式转换(instruction-response)",
+        "实现DPO格式转换(chosen-rejected)",
+        "实现GRPO格式转换(prompt-answer)",
+        "实现OpenAI Messages格式支持",
+        "添加格式自动检测"
+      ],
+      "passes": true,
+      "notes": "DataFormatDetector自动检测7种格式、SFT/DPO/GRPO/OpenAI转换、文件级转换、9项测试通过"
+    },
+    {
+      "id": "DATA-005",
+      "category": "data_factory",
+      "priority": "medium",
+      "description": "智能数据切分 - 基于语义的切分",
+      "steps": [
+        "实现随机切分(train/val/test)",
+        "实现分层切分(按类别均衡)",
+        "实现时间序列切分",
+        "添加切分比例配置"
+      ],
+      "passes": true,
+      "notes": "随机/分层/时间序列切分、可复现seed、文件输出、API接口、7项测试通过"
+    },
+    {
+      "id": "DATA-006",
+      "category": "data_factory",
+      "priority": "medium",
+      "description": "数据版本化 - Git-like版本管理",
+      "steps": [
+        "实现数据集hash计算",
+        "实现版本创建和回滚",
+        "实现版本diff对比",
+        "添加版本历史API"
+      ],
+      "passes": true,
+      "notes": "已有dataset_version router，提供版本管理API、2项测试通过"
+    },
+    {
+      "id": "EVAL-001",
+      "category": "evaluation",
+      "priority": "critical",
+      "description": "Benchmark集成 - GSM8K数学推理评测",
+      "steps": [
+        "下载并处理GSM8K数据集",
+        "实现答案提取(boxed格式)",
+        "实现准确率计算",
+        "添加评测API接口",
+        "集成到训练完成回调"
+      ],
+      "passes": true,
+      "notes": "GSM8KEvaluator、答案提取(####/boxed/last_number)、内置样本数据、API接口、5项测试通过"
+    },
+    {
+      "id": "EVAL-002",
+      "category": "evaluation",
+      "priority": "critical",
+      "description": "Benchmark集成 - MATH高等数学评测",
+      "steps": [
+        "下载并处理MATH数据集",
+        "实现符号等价验证",
+        "实现分难度级别评测",
+        "添加评测API接口"
+      ],
+      "passes": true,
+      "notes": "MATHEvaluator、LaTeX归一化、boxed提取、按难度/类型评测、4项测试通过"
+    },
+    {
+      "id": "EVAL-003",
+      "category": "evaluation",
+      "priority": "high",
+      "description": "Benchmark集成 - HumanEval代码生成评测",
+      "steps": [
+        "下载并处理HumanEval数据集",
+        "实现代码执行环境(沙箱)",
+        "实现pass@k计算",
+        "添加评测API接口"
+      ],
+      "passes": true,
+      "notes": "HumanEvalEvaluator、subprocess沙箱执行、pass@k支持、2项测试通过"
+    },
+    {
+      "id": "EVAL-004",
+      "category": "evaluation",
+      "priority": "high",
+      "description": "自动评测触发 - 训练完成后自动评测",
+      "steps": [
+        "实现checkpoint评测回调",
+        "配置评测间隔(每N步/每N小时)",
+        "实现异步评测(不阻塞训练)",
+        "评测结果写入数据库"
+      ],
+      "passes": true,
+      "notes": "EvalTrigger step/time触发、on_training_complete/on_checkpoint_saved、历史记录、6项测试通过"
+    },
+    {
+      "id": "EVAL-005",
+      "category": "evaluation",
+      "priority": "medium",
+      "description": "评估报告生成 - 自动生成评估报告",
+      "steps": [
+        "设计报告模板(Markdown/HTML)",
+        "实现指标可视化(雷达图、对比图)",
+        "实现历史版本对比",
+        "支持PDF导出"
+      ],
+      "passes": true,
+      "notes": "Markdown/HTML报告、Chart.js雷达图和柱状图、历史对比、save_report、5项测试通过"
+    },
+    {
+      "id": "EVAL-006",
+      "category": "evaluation",
+      "priority": "medium",
+      "description": "Benchmark集成 - MMLU多学科评测",
+      "steps": [
+        "下载并处理MMLU数据集",
+        "实现选择题评分",
+        "实现分学科统计",
+        "添加评测API接口"
+      ],
+      "passes": true,
+      "notes": "MMLUEvaluator、选择题字母提取、分学科统计(evaluate_by_subject)、3项测试通过"
+    },
+    {
+      "id": "UI-001",
+      "category": "ui",
+      "priority": "high",
+      "description": "数据工厂前端界面",
+      "steps": [
+        "创建数据上传组件",
+        "创建清洗配置表单",
+        "创建质量报告展示",
+        "创建版本管理界面"
+      ],
+      "passes": true,
+      "notes": "DataFactoryView.vue - 7个tab(配置模板/清洗/去重/质量/转换/切分/Benchmarks)、Puppeteer截图验证通过"
+    },
+    {
+      "id": "UI-002",
+      "category": "ui",
+      "priority": "high",
+      "description": "评估系统前端界面",
+      "steps": [
+        "创建Benchmark选择组件",
+        "创建评测结果展示",
+        "创建历史对比图表",
+        "创建评估报告预览"
+      ],
+      "passes": true,
+      "notes": "EvaluationView.vue已有完整功能(数据集/执行评估/结果/模型对照)、Puppeteer截图验证通过"
+    }
+  ],
+  "categories": {
+    "algorithm": "训练算法实现",
+    "data_factory": "数据工厂",
+    "evaluation": "系统化评估",
+    "ui": "前端界面"
+  },
+  "priority_levels": {
+    "critical": "必须完成 - 核心功能",
+    "high": "重要 - MVP必需",
+    "medium": "中等 - 完善功能",
+    "low": "低 - 后续迭代"
+  },
+  "statistics": {
+    "total": 22,
+    "completed": 22,
+    "by_category": {
+      "algorithm": 8,
+      "data_factory": 6,
+      "evaluation": 6,
+      "ui": 2
+    },
+    "by_priority": {
+      "critical": 7,
+      "high": 8,
+      "medium": 5,
+      "low": 2
+    }
+  }
+}

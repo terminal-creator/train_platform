@@ -1,0 +1,37 @@
+{
+  "name": "DPO - Direct Preference Optimization",
+  "description": "直接偏好优化训练配置模板。使用偏好数据(chosen/rejected)进行对齐，不需要reward model。",
+  "category": "alignment",
+  "algorithm": "dpo",
+  "verl_module": "verl.trainer.main_ppo",
+  "verl_algorithm_config": "algorithm=dpo",
+  "required_fields": ["model_path", "train_data_path"],
+  "data_format": {
+    "type": "preference",
+    "required_columns": ["prompt", "chosen", "rejected"],
+    "optional_columns": ["system"],
+    "description": "每条数据包含prompt、chosen(好回答)和rejected(差回答)字段"
+  },
+  "defaults": {
+    "num_epochs": 3,
+    "learning_rate": 5e-7,
+    "batch_size": 128,
+    "micro_batch_size": 4,
+    "max_prompt_length": 512,
+    "max_response_length": 1024,
+    "kl_coef": 0.1,
+    "use_kl_loss": false,
+    "lora_enabled": false,
+    "activation_checkpointing": true
+  },
+  "parameter_ranges": {
+    "learning_rate": {"min": 1e-8, "max": 1e-4, "recommended": 5e-7},
+    "batch_size": {"min": 8, "max": 512, "recommended": 128},
+    "kl_coef": {"min": 0.01, "max": 1.0, "recommended": 0.1}
+  },
+  "tips": [
+    "DPO是最常用的对齐算法之一，不需要训练reward model",
+    "数据质量非常重要：chosen和rejected之间的差异要明显",
+    "学习率通常比SFT低一个数量级"
+  ]
+}
