@@ -32,7 +32,7 @@ export const useJobsStore = defineStore('jobs', () => {
       runMode.value = runModeConfig.value.mode || 'local'
       return runModeConfig.value
     } catch (error) {
-      console.error('Failed to fetch run mode config:', error)
+      console.warn('Failed to fetch run mode config:', error.message)
       runMode.value = 'local'
       return null
     } finally {
@@ -86,11 +86,13 @@ export const useJobsStore = defineStore('jobs', () => {
     loading.value = true
     try {
       const data = await api.getJobs(params)
-      jobs.value = data.jobs
+      jobs.value = data.jobs || []
       return data
     } catch (error) {
-      appStore.showError(error.message)
-      throw error
+      // Silently fail - just show empty list
+      console.warn('Failed to fetch jobs:', error.message)
+      jobs.value = []
+      return { jobs: [] }
     } finally {
       loading.value = false
     }
@@ -196,7 +198,7 @@ export const useJobsStore = defineStore('jobs', () => {
       }
       return availableModels.value
     } catch (error) {
-      console.error('Failed to fetch available models:', error)
+      console.warn('Failed to fetch available models:', error.message)
       availableModels.value = []
       return []
     }
@@ -213,7 +215,7 @@ export const useJobsStore = defineStore('jobs', () => {
       }
       return availableDatasets.value
     } catch (error) {
-      console.error('Failed to fetch available datasets:', error)
+      console.warn('Failed to fetch available datasets:', error.message)
       availableDatasets.value = []
       return []
     }
@@ -225,7 +227,7 @@ export const useJobsStore = defineStore('jobs', () => {
       availableRewardScripts.value = await api.getAvailableRewardScripts()
       return availableRewardScripts.value
     } catch (error) {
-      console.error('Failed to fetch available reward scripts:', error)
+      console.warn('Failed to fetch available reward scripts:', error.message)
       availableRewardScripts.value = []
       return []
     }

@@ -43,6 +43,17 @@ const memory = computed(() => {
   }
 })
 
+const formatLearningRate = (lr) => {
+  if (!lr) return '1e-6'
+  if (lr >= 1) return lr.toString()
+  const exp = Math.floor(Math.log10(lr))
+  const mantissa = lr / Math.pow(10, exp)
+  if (Math.abs(mantissa - 1) < 0.01) {
+    return `1e${exp}`
+  }
+  return `${mantissa.toFixed(1)}e${exp}`
+}
+
 const configResult = computed(() => {
   const r = computeStore.result
   if (!r?.config) return null
@@ -52,7 +63,7 @@ const configResult = computed(() => {
     gradientAccum: r.config.trainer?.gradient_accumulation_steps,
     globalBatchSize: r.config.computed?.global_batch_size,
     tensorParallel: r.config.rollout?.tensor_parallel_size,
-    learningRate: r.config.actor?.optim?.lr
+    learningRate: formatLearningRate(r.config.actor?.optim?.lr)
   }
 })
 
@@ -173,19 +184,19 @@ onMounted(async () => {
 
         <div class="grid grid-cols-2 gap-3 text-xs">
           <div class="bg-gray-50 rounded-md p-2.5">
-            <span class="text-gray-500">模型权重</span>
+            <span class="text-gray-500">Model Weights</span>
             <p class="font-medium text-gray-800">{{ memory?.modelWeights?.toFixed(2) || 0 }} GB</p>
           </div>
           <div class="bg-gray-50 rounded-md p-2.5">
-            <span class="text-gray-500">优化器状态</span>
+            <span class="text-gray-500">Optimizer States</span>
             <p class="font-medium text-gray-800">{{ memory?.optimizer?.toFixed(2) || 0 }} GB</p>
           </div>
           <div class="bg-gray-50 rounded-md p-2.5">
-            <span class="text-gray-500">梯度</span>
+            <span class="text-gray-500">Gradients</span>
             <p class="font-medium text-gray-800">{{ memory?.gradients?.toFixed(2) || 0 }} GB</p>
           </div>
           <div class="bg-gray-50 rounded-md p-2.5">
-            <span class="text-gray-500">激活值</span>
+            <span class="text-gray-500">Activations</span>
             <p class="font-medium text-gray-800">{{ memory?.activations?.toFixed(2) || 0 }} GB</p>
           </div>
         </div>
@@ -200,27 +211,27 @@ onMounted(async () => {
 
         <div class="space-y-2 text-xs">
           <div class="flex justify-between py-1.5 border-b border-gray-100">
-            <span class="text-gray-500">ZeRO 阶段</span>
+            <span class="text-gray-500">ZeRO Stage</span>
             <span class="font-medium text-gray-800">ZeRO-{{ configResult?.zeroStage || 2 }}</span>
           </div>
           <div class="flex justify-between py-1.5 border-b border-gray-100">
-            <span class="text-gray-500">微批量大小</span>
+            <span class="text-gray-500">Micro Batch Size</span>
             <span class="font-medium text-gray-800">{{ configResult?.microBatchSize || 4 }}</span>
           </div>
           <div class="flex justify-between py-1.5 border-b border-gray-100">
-            <span class="text-gray-500">梯度累积步数</span>
+            <span class="text-gray-500">Gradient Accumulation</span>
             <span class="font-medium text-gray-800">{{ configResult?.gradientAccum || 8 }}</span>
           </div>
           <div class="flex justify-between py-1.5 border-b border-gray-100">
-            <span class="text-gray-500">全局批量大小</span>
+            <span class="text-gray-500">Global Batch Size</span>
             <span class="font-medium text-gray-800">{{ configResult?.globalBatchSize || 256 }}</span>
           </div>
           <div class="flex justify-between py-1.5 border-b border-gray-100">
-            <span class="text-gray-500">张量并行度</span>
+            <span class="text-gray-500">Tensor Parallel</span>
             <span class="font-medium text-gray-800">{{ configResult?.tensorParallel || 1 }}</span>
           </div>
           <div class="flex justify-between py-1.5">
-            <span class="text-gray-500">学习率</span>
+            <span class="text-gray-500">Learning Rate</span>
             <span class="font-medium text-gray-800">{{ configResult?.learningRate || '1e-6' }}</span>
           </div>
         </div>

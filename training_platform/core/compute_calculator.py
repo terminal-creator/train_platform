@@ -131,12 +131,19 @@ class ComputeCalculator:
     # Default learning rates by model size
     DEFAULT_LR = {
         "0.5B": 5e-6,
+        "0.6B": 5e-6,
         "1.5B": 3e-6,
         "3B": 2e-6,
         "7B": 1e-6,
+        "8B": 1e-6,
         "14B": 5e-7,
         "32B": 3e-7,
+        "70B": 1e-7,
         "72B": 1e-7,
+        "110B": 5e-8,
+        "235B": 3e-8,
+        "405B": 1e-8,
+        "671B": 5e-9,
     }
 
     # Algorithm specific configs

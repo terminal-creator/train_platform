@@ -36,7 +36,8 @@ function saveToStorage(data) {
 }
 
 export const useSettingsStore = defineStore('settings', () => {
-  const appStore = useAppStore()
+  // Helper function to get app store (lazy initialization)
+  const getAppStore = () => useAppStore()
 
   // Load stored state
   const stored = loadFromStorage()
@@ -203,13 +204,13 @@ export const useSettingsStore = defineStore('settings', () => {
           ssh_conda_env: sshConfig.value.conda_env
         }
 
-        appStore.showSuccess('连接成功！')
+        getAppStore().showSuccess('连接成功！')
       } else {
-        appStore.showError(connectionStatus.value.error || '连接失败')
+        getAppStore().showError(connectionStatus.value.error || '连接失败')
       }
     } catch (error) {
       connectionStatus.value = { success: false, error: error.message }
-      appStore.showError(error.message)
+      getAppStore().showError(error.message)
     } finally {
       testingConnection.value = false
     }
@@ -249,12 +250,12 @@ export const useSettingsStore = defineStore('settings', () => {
         connectionStatus.value = { success: true, message: '本地模式' }
       }
 
-      appStore.showSuccess('配置已保存！')
+      getAppStore().showSuccess('配置已保存！')
 
       // Refresh GPU info
       await loadGpuInfo()
     } catch (error) {
-      appStore.showError(error.message)
+      getAppStore().showError(error.message)
     } finally {
       saving.value = false
     }

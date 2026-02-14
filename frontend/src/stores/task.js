@@ -40,16 +40,16 @@ export const useTaskStore = defineStore('task', () => {
    * 获取任务列表
    */
   const fetchTasks = async (params = {}) => {
-    loading.value = true
+    // Don't show loading spinner - just fetch in background
+    loading.value = false
     try {
       const response = await taskAPI.listTasks(params)
       tasks.value = response.tasks || []
       return response
     } catch (error) {
-      appStore.showError(`获取任务列表失败: ${error.message}`)
-      throw error
-    } finally {
-      loading.value = false
+      // Silently fail - just show empty list
+      tasks.value = []
+      return { tasks: [], total: 0 }
     }
   }
 
@@ -132,8 +132,9 @@ export const useTaskStore = defineStore('task', () => {
       stats.value = response
       return response
     } catch (error) {
-      console.error('Failed to fetch task stats:', error)
-      throw error
+      // Silently fail - just keep default stats
+      console.warn('Failed to fetch task stats:', error.message)
+      return stats.value
     }
   }
 

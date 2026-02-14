@@ -57,6 +57,155 @@ const route = useRoute()
 const jobsStore = useJobsStore()
 const appStore = useAppStore()
 
+// ============ DEMO MODE: Mock Data Generation ============
+const DEMO_MODE = false // Set to true to enable mock data
+
+// Generate realistic training metrics
+const generateMockMetrics = (numSteps = 500) => {
+  const metrics = []
+  let baseLoss = 2.5 + Math.random() * 0.5
+  let baseReward = -0.5 + Math.random() * 0.2
+  let baseKL = 0.001
+
+  for (let i = 0; i < numSteps; i++) {
+    const step = i * 10
+    const progress = i / numSteps
+
+    // Loss decreases with some noise and occasional spikes
+    const lossDecay = Math.exp(-progress * 2)
+    const lossNoise = (Math.random() - 0.5) * 0.1 * lossDecay
+    const loss = baseLoss * lossDecay + lossNoise + 0.3
+
+    // Reward increases with training
+    const rewardGrowth = progress * 2.5
+    const rewardNoise = (Math.random() - 0.5) * 0.15
+    const reward = baseReward + rewardGrowth + rewardNoise
+
+    // KL divergence increases then stabilizes
+    const klGrowth = Math.min(0.02, progress * 0.03)
+    const klNoise = Math.random() * 0.002
+    const kl = baseKL + klGrowth + klNoise
+
+    // Gradient norms with occasional spikes
+    const actorGrad = 0.5 + Math.random() * 0.3 + (Math.random() > 0.95 ? 2 : 0)
+    const criticGrad = 0.8 + Math.random() * 0.4 + (Math.random() > 0.95 ? 1.5 : 0)
+
+    // Throughput with warm-up effect
+    const warmup = Math.min(1, i / 50)
+    const throughput = (15000 + Math.random() * 3000) * warmup
+
+    // GPU memory usage
+    const gpuMemory = 65 + Math.random() * 10
+
+    metrics.push({
+      step,
+      timestamp: new Date(Date.now() - (numSteps - i) * 60000).toISOString(),
+      loss: { total_loss: loss, policy_loss: loss * 0.7, value_loss: loss * 0.3 },
+      reward: { mean: reward, std: 0.3 + Math.random() * 0.1, min: reward - 1, max: reward + 1.5 },
+      kl: { mean: kl, max: kl * 1.5 },
+      gradient: { actor_norm: actorGrad, critic_norm: criticGrad },
+      performance: { tokens_per_second: throughput, gpu_memory_allocated: gpuMemory },
+      total_loss: loss,
+      reward_mean: reward,
+      kl_divergence: kl,
+      grad_norm_actor: actorGrad,
+      grad_norm_critic: criticGrad,
+      tokens_per_second: throughput,
+      gpu_memory_allocated_gib: gpuMemory
+    })
+  }
+  return metrics
+}
+
+// Generate GPU usage for a large cluster
+const generateMockGpuUsage = (numGpus = 64) => {
+  const gpus = []
+  for (let i = 0; i < numGpus; i++) {
+    // Most GPUs should be highly utilized
+    const baseUtil = 85 + Math.random() * 15
+    const util = Math.min(100, Math.max(0, baseUtil - (Math.random() > 0.9 ? 20 : 0)))
+    gpus.push({
+      index: i,
+      utilization: Math.round(util),
+      memory_used: 70 + Math.random() * 8,
+      memory_total: 80,
+      name: 'NVIDIA A100-SXM4-80GB'
+    })
+  }
+  return gpus
+}
+
+// Generate gradient stats per layer
+const generateMockGradientStats = () => {
+  const layers = [
+    'model.embed_tokens',
+    'model.layers.0.self_attn.q_proj',
+    'model.layers.0.self_attn.k_proj',
+    'model.layers.0.self_attn.v_proj',
+    'model.layers.0.self_attn.o_proj',
+    'model.layers.0.mlp.gate_proj',
+    'model.layers.0.mlp.up_proj',
+    'model.layers.0.mlp.down_proj',
+    'model.layers.15.self_attn.q_proj',
+    'model.layers.15.mlp.gate_proj',
+    'model.layers.31.self_attn.q_proj',
+    'model.layers.31.mlp.down_proj',
+    'model.norm',
+    'lm_head'
+  ]
+
+  return layers.map(layer => ({
+    layer_name: layer,
+    mean: (Math.random() - 0.5) * 0.001,
+    std: Math.random() * 0.01 + 0.001,
+    min: -0.05 - Math.random() * 0.02,
+    max: 0.05 + Math.random() * 0.02,
+    norm: Math.random() * 0.5 + 0.1
+  }))
+}
+
+// Generate health status
+const generateMockHealth = () => ({
+  status: 'healthy',
+  health_score: 92 + Math.floor(Math.random() * 6),
+  checked_at: new Date().toISOString(),
+  metrics_analyzed: 500,
+  suggestions: [
+    '训练进展顺利，loss 稳定下降',
+    '建议在 step 6000 时进行 checkpoint 保存',
+    'KL 散度在正常范围内'
+  ]
+})
+
+// Generate some minor anomalies (to show the detection is working)
+const generateMockAnomalies = () => [
+  {
+    severity: 'low',
+    message: 'Step 2340 梯度范数略高于平均值 (2.1x)',
+    step: 2340,
+    detected_at: new Date(Date.now() - 300000).toISOString()
+  },
+  {
+    severity: 'low',
+    message: 'GPU 47 利用率短暂下降至 65%',
+    step: 3120,
+    detected_at: new Date(Date.now() - 180000).toISOString()
+  }
+]
+
+// Mock job for demo
+const mockJob = {
+  id: 'demo-job-001',
+  name: 'Qwen2.5-7B-GRPO-Sales',
+  status: 'running',
+  algorithm: 'grpo',
+  current_step: 4980,
+  total_steps: 10000,
+  model: 'Qwen/Qwen2.5-7B',
+  created_at: new Date(Date.now() - 3600000 * 8).toISOString()
+}
+// ============ END DEMO MODE ============
+
 // Load from route params, or localStorage, or empty
 const savedJobId = localStorage.getItem('monitoring_selected_job') || ''
 const selectedJobId = ref(route.params.jobId || savedJobId)
@@ -84,7 +233,7 @@ const availableMetrics = [
   { id: 'tokens_per_second', label: '吞吐量', icon: Clock },
   { id: 'gpu_memory', label: 'GPU 显存', icon: Cpu }
 ]
-const selectedChartMetrics = ref(['loss', 'reward']) // Default: show loss and reward
+const selectedChartMetrics = ref(DEMO_MODE ? ['loss', 'reward', 'kl', 'gradient'] : ['loss', 'reward']) // Demo shows more metrics
 
 // Phase 1.5: Historical metrics view
 const showHistoryMode = ref(false)
@@ -93,6 +242,9 @@ const historyEndStep = ref(null)
 const historyMetrics = ref([])
 
 const selectedJob = computed(() => {
+  if (DEMO_MODE && selectedJobId.value === mockJob.id) {
+    return mockJob
+  }
   return jobsStore.jobs.find(j => j.id === selectedJobId.value)
 })
 
@@ -406,10 +558,15 @@ const getGradientColor = (norm) => {
   return 'text-red-400'
 }
 
-// Get heatmap cell color based on normalized value (0-1)
+// Get heatmap cell color based on log10 gradient norm value
+// Input: log10 value, typically in range [-3, 0]
+// -3 (very small gradient) -> green
+// -1.5 (medium) -> yellow
+// 0 (large gradient) -> red
 const getHeatmapColor = (value) => {
-  // Green to yellow to red gradient
-  const normalized = Math.min(1, Math.max(0, value * 10)) // Scale for better visibility
+  // Normalize from [-3, 0] to [0, 1]
+  const normalized = Math.min(1, Math.max(0, (value + 3) / 3))
+
   if (normalized < 0.5) {
     // Green to Yellow
     const g = 200
@@ -451,6 +608,66 @@ watch([historyStartStep, historyEndStep], () => {
 })
 
 onMounted(async () => {
+  // ============ DEMO MODE: Inject mock data ============
+  if (DEMO_MODE) {
+    // Add mock job to store if not exists
+    if (!jobsStore.jobs.find(j => j.id === mockJob.id)) {
+      jobsStore.jobs.unshift(mockJob)
+    }
+    selectedJobId.value = mockJob.id
+
+    // Generate mock data
+    metrics.value = generateMockMetrics(500)
+    gpuUsage.value = generateMockGpuUsage(64)
+    gradientStats.value = generateMockGradientStats()
+    health.value = generateMockHealth()
+    anomalies.value = generateMockAnomalies()
+
+    // Simulate live updates
+    setInterval(() => {
+      if (!DEMO_MODE || !autoRefresh.value) return
+
+      const lastStep = metrics.value.length > 0 ? metrics.value[metrics.value.length - 1].step : 0
+      const newStep = lastStep + 10
+      const progress = newStep / 10000
+
+      const lossDecay = Math.exp(-progress * 2)
+      const loss = 2.5 * lossDecay + (Math.random() - 0.5) * 0.05 + 0.3
+      const reward = -0.5 + progress * 2.5 + (Math.random() - 0.5) * 0.1
+      const kl = 0.001 + Math.min(0.02, progress * 0.03) + Math.random() * 0.001
+
+      metrics.value.push({
+        step: newStep,
+        timestamp: new Date().toISOString(),
+        loss: { total_loss: loss },
+        reward: { mean: reward },
+        kl: { mean: kl },
+        gradient: { actor_norm: 0.5 + Math.random() * 0.3, critic_norm: 0.8 + Math.random() * 0.4 },
+        performance: { tokens_per_second: 15000 + Math.random() * 3000, gpu_memory_allocated: 65 + Math.random() * 10 },
+        total_loss: loss,
+        reward_mean: reward,
+        kl_divergence: kl
+      })
+
+      // Keep only last 500 points
+      if (metrics.value.length > 500) {
+        metrics.value = metrics.value.slice(-500)
+      }
+
+      // Randomly update some GPU utilizations
+      gpuUsage.value = gpuUsage.value.map(gpu => ({
+        ...gpu,
+        utilization: Math.min(100, Math.max(70, gpu.utilization + (Math.random() - 0.5) * 5))
+      }))
+
+      // Update mock job progress
+      mockJob.current_step = newStep
+    }, 2000)
+
+    return
+  }
+  // ============ END DEMO MODE ============
+
   await jobsStore.fetchJobs()
 
   // If saved job ID doesn't exist in jobs list, clear it
@@ -479,6 +696,17 @@ onUnmounted(() => {
 
 <template>
   <div>
+    <!-- Demo Mode Banner -->
+    <div v-if="DEMO_MODE" class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg mb-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="animate-pulse w-2 h-2 bg-green-400 rounded-full"></span>
+        <span class="font-medium">🚀 DEMO MODE - Qwen2.5-7B GRPO 训练实时监控</span>
+      </div>
+      <div class="text-sm opacity-80">
+        64x A100 · 15K+ tokens/s · 8小时已运行
+      </div>
+    </div>
+
     <!-- Header Controls -->
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-4">
@@ -753,6 +981,68 @@ onUnmounted(() => {
           <span class="flex items-center gap-1">
             <span class="w-3 h-3 rounded bg-red-500"></span> &lt;70%
           </span>
+        </div>
+      </div>
+
+      <!-- Gradient Heatmap -->
+      <div class="glass-card rounded-lg p-4">
+        <h3 class="font-medium mb-4">梯度热力图</h3>
+        <div v-if="!gradientHeatmap || !gradientHeatmap.layers" class="text-center py-8 text-gray-500">
+          暂无热力图数据
+        </div>
+        <div v-else class="overflow-x-auto">
+          <!-- Heatmap Legend -->
+          <div class="flex items-center justify-end gap-4 mb-3 text-xs text-gray-500">
+            <span>梯度范数 (log10):</span>
+            <div class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: rgb(50, 200, 50)"></span>
+              <span>低</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: rgb(255, 200, 50)"></span>
+              <span>中</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: rgb(255, 50, 50)"></span>
+              <span>高</span>
+            </div>
+          </div>
+          <!-- Heatmap Grid -->
+          <div class="relative">
+            <!-- Y-axis labels (layers) -->
+            <div class="flex">
+              <div class="w-24 flex-shrink-0"></div>
+              <div class="flex-1 flex justify-between text-2xs text-gray-400 mb-1 px-1">
+                <span>Step {{ gradientHeatmap.steps[0] }}</span>
+                <span>Step {{ gradientHeatmap.steps[Math.floor(gradientHeatmap.steps.length / 2)] }}</span>
+                <span>Step {{ gradientHeatmap.steps[gradientHeatmap.steps.length - 1] }}</span>
+              </div>
+            </div>
+            <!-- Heatmap rows -->
+            <div class="space-y-px max-h-80 overflow-y-auto">
+              <div
+                v-for="(row, layerIdx) in gradientHeatmap.values.slice(0, 20)"
+                :key="layerIdx"
+                class="flex items-center"
+              >
+                <div class="w-24 flex-shrink-0 text-2xs text-gray-500 truncate pr-2">
+                  {{ gradientHeatmap.layers[layerIdx] }}
+                </div>
+                <div class="flex-1 flex gap-px">
+                  <div
+                    v-for="(value, stepIdx) in row"
+                    :key="stepIdx"
+                    class="flex-1 h-3 rounded-sm cursor-pointer hover:opacity-80"
+                    :style="{ backgroundColor: getHeatmapColor(value) }"
+                    :title="`${gradientHeatmap.layers[layerIdx]} @ Step ${gradientHeatmap.steps[stepIdx]}: ${value.toFixed(4)}`"
+                  ></div>
+                </div>
+              </div>
+            </div>
+            <div v-if="gradientHeatmap.layers.length > 20" class="text-center text-2xs text-gray-400 mt-2">
+              显示前20层，共 {{ gradientHeatmap.layers.length }} 层
+            </div>
+          </div>
         </div>
       </div>
 

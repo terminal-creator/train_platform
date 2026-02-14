@@ -7,7 +7,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api/v1/celery-tasks',
-  timeout: 30000,
+  timeout: 5000,  // 5 seconds timeout - fail fast
   headers: {
     'Content-Type': 'application/json'
   }

@@ -240,16 +240,58 @@
         </div>
       </div>
     </div>
+
+    <!-- Hidden: Version info, click 5 times to toggle demo mode -->
+    <div class="mt-8 text-center">
+      <span
+        class="text-xs text-gray-400 cursor-default select-none"
+        @click="handleVersionClick"
+      >
+        v1.0.0
+      </span>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useDemoStore } from '@/demo/demoStore'
 
 const store = useSettingsStore()
+const demoStore = useDemoStore()
+
+const demoSpeed = ref(1)
+const clickCount = ref(0)
+let clickTimer = null
+
+function handleVersionClick() {
+  clickCount.value++
+  if (clickTimer) clearTimeout(clickTimer)
+  clickTimer = setTimeout(() => { clickCount.value = 0 }, 2000)
+  if (clickCount.value >= 5) {
+    clickCount.value = 0
+    toggleDemoMode()
+  }
+}
+
+async function toggleDemoMode() {
+  try {
+    await demoStore.toggleDemoMode()
+  } catch (error) {
+    console.error('Failed to toggle demo mode:', error)
+  }
+}
+
+async function updateDemoSpeed() {
+  if (demoStore.enabled) {
+    await demoStore.setSpeed(demoSpeed.value)
+  }
+}
 
 onMounted(() => {
   store.loadConfig()
+  demoStore.init()
+  demoSpeed.value = demoStore.speed
 })
 </script>

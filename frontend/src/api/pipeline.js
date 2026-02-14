@@ -7,7 +7,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api/v1/pipelines',
-  timeout: 30000,
+  timeout: 10000,  // 10 seconds
   headers: {
     'Content-Type': 'application/json'
   }

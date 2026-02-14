@@ -258,6 +258,28 @@ class TrainingDataset(SQLModel, table=True):
     field_distributions: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
     # {"tenant": {"珍酒": 180, "之了课堂": 102}, "best_model": {...}}
 
+    # Pre-computed statistics (computed on upload)
+    statistics: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
+    # {
+    #   "format_type": "messages" | "prompt_response",
+    #   "avg_turns": 1.5,
+    #   "avg_prompt_chars": 100,
+    #   "avg_response_chars": 200,
+    #   "avg_total_chars": 300,
+    #   "has_system_prompt": 85.0,  # percentage
+    #   "prompt_length_distribution": {"0-50": 10, "50-100": 50, ...},
+    #   "response_length_distribution": {...},
+    #   "turns_distribution": {"1轮": 100, "2轮": 50, ...}
+    # }
+
+    # Pre-computed quality stats
+    quality_stats: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
+    # {
+    #   "quality_score": 85.5,
+    #   "issues_found": 10,
+    #   "issues": [{"issue_type": "空回复", "count": 5, "percentage": 0.5, "sample_indices": [1,2,3]}]
+    # }
+
     # Loss computation field configuration
     prompt_field: str = "prompt"
     response_field: str = "response"

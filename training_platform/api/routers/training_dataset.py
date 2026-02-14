@@ -304,26 +304,120 @@ def _check_quality_issues(records: List[Dict]) -> List[QualityIssue]:
     return issues
 
 
+def compute_dataset_statistics(records: List[Dict]) -> Dict[str, Any]:
+    """
+    Compute comprehensive statistics for a dataset.
+    Returns a dict that can be stored in the statistics JSON field.
+    """
+    if not records:
+        return {}
+
+    # Analyze all records
+    analyses = [_analyze_record(r) for r in records]
+    total = len(analyses)
+
+    # Calculate averages
+    avg_turns = sum(a["turns"] for a in analyses) / total
+    avg_prompt_chars = sum(a["prompt_chars"] for a in analyses) / total
+    avg_response_chars = sum(a["response_chars"] for a in analyses) / total
+    avg_total_chars = sum(a["total_chars"] for a in analyses) / total
+
+    # Determine format type
+    format_counts = {}
+    for a in analyses:
+        fmt = a["format"]
+        format_counts[fmt] = format_counts.get(fmt, 0) + 1
+    format_type = max(format_counts, key=format_counts.get)
+
+    # System prompt percentage
+    has_system_count = sum(1 for a in analyses if a["has_system"])
+    has_system_pct = round(has_system_count / total * 100, 1)
+
+    # Length distributions
+    prompt_length_dist = {}
+    response_length_dist = {}
+    turns_dist = {}
+
+    for a in analyses:
+        # Prompt length bucket
+        bucket = _get_length_bucket(a["prompt_chars"])
+        prompt_length_dist[bucket] = prompt_length_dist.get(bucket, 0) + 1
+
+        # Response length bucket
+        bucket = _get_length_bucket(a["response_chars"])
+        response_length_dist[bucket] = response_length_dist.get(bucket, 0) + 1
+
+        # Turns bucket
+        bucket = _get_turns_bucket(a["turns"])
+        turns_dist[bucket] = turns_dist.get(bucket, 0) + 1
+
+    return {
+        "total_samples": total,
+        "avg_turns": round(avg_turns, 2),
+        "avg_prompt_chars": round(avg_prompt_chars, 0),
+        "avg_response_chars": round(avg_response_chars, 0),
+        "avg_total_chars": round(avg_total_chars, 0),
+        "format_type": format_type,
+        "has_system_prompt": has_system_pct,
+        "prompt_length_distribution": prompt_length_dist,
+        "response_length_distribution": response_length_dist,
+        "turns_distribution": turns_dist,
+    }
+
+
+def compute_quality_statistics(records: List[Dict]) -> Dict[str, Any]:
+    """
+    Compute quality statistics for a dataset.
+    Returns a dict that can be stored in the quality_stats JSON field.
+    """
+    if not records:
+        return {"quality_score": 100.0, "issues_found": 0, "issues": []}
+
+    # Check for issues
+    issues = _check_quality_issues(records)
+
+    # Calculate quality score (100 - penalty for each issue type)
+    total_issues = sum(issue.count for issue in issues)
+    issue_ratio = total_issues / len(records)
+    quality_score = max(0, 100 - issue_ratio * 100)
+
+    # Convert issues to dict format for JSON storage
+    issues_list = [
+        {
+            "issue_type": issue.issue_type,
+            "count": issue.count,
+            "percentage": issue.percentage,
+            "sample_indices": issue.sample_indices,
+        }
+        for issue in issues
+    ]
+
+    return {
+        "total_samples": len(records),
+        "quality_score": round(quality_score, 1),
+        "issues_found": total_issues,
+        "issues": issues_list,
+    }
+
+
 def detect_label_fields(records: List[Dict], reserved_fields: set = None) -> List[str]:
     """
-    Detect fields suitable as labels (string type + low cardinality).
+    Detect fields suitable as labels (categorical data with low cardinality).
 
     A field is considered a good label if:
-    - It's a string type
-    - Cardinality (unique values) is less than 30% of total records
-    - Not in reserved fields list
+    - It's a simple type (not dict/list)
+    - Short average length (< 100 chars) - not long text content
+    - Low cardinality: either < 30 unique values OR < 30% unique ratio
+    - At least 50% non-null values
     """
+    # Only exclude truly special fields, detect everything else dynamically
     if reserved_fields is None:
-        reserved_fields = {
-            'prompt', 'response', 'messages', 'input', 'output',
-            'all_model_outputs', 'evaluation', 'reference_script',
-            'history_dialogue', 'last_message', 'id', 'uuid'
-        }
+        reserved_fields = {'id', 'uuid', '_id'}
 
     if not records:
         return []
 
-    sample_size = min(len(records), 100)
+    sample_size = min(len(records), 200)  # Use larger sample for better detection
     sample_records = records[:sample_size]
 
     detected = []
@@ -333,16 +427,29 @@ def detect_label_fields(records: List[Dict], reserved_fields: set = None) -> Lis
 
         # Get values for this field
         values = []
+        total_length = 0
         for r in sample_records:
             val = r.get(field)
-            if val is not None and isinstance(val, str):
-                values.append(val)
+            # Skip complex types (dict, list)
+            if isinstance(val, (dict, list)):
+                break
+            if val is not None:
+                str_val = str(val)
+                values.append(str_val)
+                total_length += len(str_val)
+        else:
+            # Only proceed if we didn't break (no complex types found)
+            if len(values) >= sample_size * 0.5:  # At least 50% non-null
+                avg_length = total_length / len(values) if values else 0
+                unique_count = len(set(values))
+                unique_ratio = unique_count / len(values) if values else 1
 
-        # Check if it's a good label field
-        if len(values) >= sample_size * 0.5:  # At least 50% non-null
-            unique_ratio = len(set(values)) / len(values) if values else 1
-            if unique_ratio < 0.3:  # Less than 30% unique (good for grouping)
-                detected.append(field)
+                # Good label criteria:
+                # 1. Short values (not long text content)
+                # 2. Low cardinality: < 30 unique values OR < 30% unique ratio
+                # This catches small datasets with few categories AND large datasets
+                if avg_length < 100 and (unique_count < 30 or unique_ratio < 0.3):
+                    detected.append(field)
 
     return detected
 
@@ -535,6 +642,10 @@ async def upload_training_dataset(
         # Compute distributions
         field_distributions = compute_field_distributions(records, parsed_label_fields)
 
+        # Pre-compute statistics and quality (one-time on upload)
+        statistics = compute_dataset_statistics(records)
+        quality_stats = compute_quality_statistics(records)
+
         # Create database record
         dataset = TrainingDataset(
             uuid=dataset_uuid,
@@ -547,6 +658,8 @@ async def upload_training_dataset(
             columns=columns,
             label_fields=parsed_label_fields,
             field_distributions=field_distributions,
+            statistics=statistics,
+            quality_stats=quality_stats,
             prompt_field=prompt_field,
             response_field=response_field,
             analyzed_at=datetime.utcnow(),
@@ -666,12 +779,14 @@ async def get_distribution(
 @router.get("/{uuid}/stats", response_model=DatasetStatsResponse)
 async def get_dataset_stats(
     uuid: str,
+    recompute: bool = Query(False, description="Force recompute statistics from file"),
     session: Session = Depends(get_session),
 ):
     """
     Get comprehensive statistics for a dataset.
 
-    Includes length distributions, turn counts, and format analysis.
+    Returns cached statistics by default (computed on upload).
+    Use recompute=true to force recalculation from file.
     """
     repo = TrainingDatasetRepository(session)
     dataset = repo.get_by_uuid(uuid)
@@ -679,74 +794,60 @@ async def get_dataset_stats(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    # Load records
+    # Return cached stats if available and not forcing recompute
+    if dataset.statistics and not recompute:
+        stats = dataset.statistics
+        return DatasetStatsResponse(
+            total_samples=stats.get("total_samples", dataset.total_rows),
+            avg_turns=stats.get("avg_turns", 1),
+            avg_prompt_chars=stats.get("avg_prompt_chars", 0),
+            avg_response_chars=stats.get("avg_response_chars", 0),
+            avg_total_chars=stats.get("avg_total_chars", 0),
+            format_type=stats.get("format_type", "unknown"),
+            has_system_prompt=stats.get("has_system_prompt", 0),
+            prompt_length_distribution=stats.get("prompt_length_distribution", {}),
+            response_length_distribution=stats.get("response_length_distribution", {}),
+            turns_distribution=stats.get("turns_distribution", {}),
+        )
+
+    # Recompute from file (for legacy datasets or forced recompute)
     records = load_dataset_records(dataset.file_path, dataset.file_format)
 
     if not records:
         raise HTTPException(status_code=400, detail="Dataset is empty")
 
-    # Analyze all records
-    analyses = [_analyze_record(r) for r in records]
+    stats = compute_dataset_statistics(records)
 
-    # Calculate averages
-    total = len(analyses)
-    avg_turns = sum(a["turns"] for a in analyses) / total
-    avg_prompt_chars = sum(a["prompt_chars"] for a in analyses) / total
-    avg_response_chars = sum(a["response_chars"] for a in analyses) / total
-    avg_total_chars = sum(a["total_chars"] for a in analyses) / total
-
-    # Determine format type
-    format_counts = {}
-    for a in analyses:
-        fmt = a["format"]
-        format_counts[fmt] = format_counts.get(fmt, 0) + 1
-    format_type = max(format_counts, key=format_counts.get)
-
-    # System prompt percentage
-    has_system_count = sum(1 for a in analyses if a["has_system"])
-    has_system_pct = round(has_system_count / total * 100, 1)
-
-    # Length distributions
-    prompt_length_dist = {}
-    response_length_dist = {}
-    turns_dist = {}
-
-    for a in analyses:
-        # Prompt length bucket
-        bucket = _get_length_bucket(a["prompt_chars"])
-        prompt_length_dist[bucket] = prompt_length_dist.get(bucket, 0) + 1
-
-        # Response length bucket
-        bucket = _get_length_bucket(a["response_chars"])
-        response_length_dist[bucket] = response_length_dist.get(bucket, 0) + 1
-
-        # Turns bucket
-        bucket = _get_turns_bucket(a["turns"])
-        turns_dist[bucket] = turns_dist.get(bucket, 0) + 1
+    # Update cached stats in database
+    dataset.statistics = stats
+    dataset.analyzed_at = datetime.utcnow()
+    repo.update(dataset)
 
     return DatasetStatsResponse(
-        total_samples=total,
-        avg_turns=round(avg_turns, 2),
-        avg_prompt_chars=round(avg_prompt_chars, 0),
-        avg_response_chars=round(avg_response_chars, 0),
-        avg_total_chars=round(avg_total_chars, 0),
-        format_type=format_type,
-        has_system_prompt=has_system_pct,
-        prompt_length_distribution=prompt_length_dist,
-        response_length_distribution=response_length_dist,
-        turns_distribution=turns_dist,
+        total_samples=stats["total_samples"],
+        avg_turns=stats["avg_turns"],
+        avg_prompt_chars=stats["avg_prompt_chars"],
+        avg_response_chars=stats["avg_response_chars"],
+        avg_total_chars=stats["avg_total_chars"],
+        format_type=stats["format_type"],
+        has_system_prompt=stats["has_system_prompt"],
+        prompt_length_distribution=stats["prompt_length_distribution"],
+        response_length_distribution=stats["response_length_distribution"],
+        turns_distribution=stats["turns_distribution"],
     )
 
 
 @router.get("/{uuid}/quality-check", response_model=QualityCheckResponse)
 async def check_dataset_quality(
     uuid: str,
+    recompute: bool = Query(False, description="Force recompute quality check from file"),
     session: Session = Depends(get_session),
 ):
     """
     Run quality checks on the dataset.
 
-    Detects issues like empty responses, short responses, duplicates, etc.
+    Returns cached quality stats by default (computed on upload).
+    Use recompute=true to force recalculation from file.
     """
     repo = TrainingDatasetRepository(session)
     dataset = repo.get_by_uuid(uuid)
@@ -754,24 +855,53 @@ async def check_dataset_quality(
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    # Load records
+    # Return cached quality stats if available and not forcing recompute
+    if dataset.quality_stats and not recompute:
+        qstats = dataset.quality_stats
+        # Convert stored issues back to QualityIssue objects
+        issues = [
+            QualityIssue(
+                issue_type=issue["issue_type"],
+                count=issue["count"],
+                percentage=issue["percentage"],
+                sample_indices=issue["sample_indices"],
+            )
+            for issue in qstats.get("issues", [])
+        ]
+        return QualityCheckResponse(
+            total_samples=qstats.get("total_samples", dataset.total_rows),
+            issues_found=qstats.get("issues_found", 0),
+            quality_score=qstats.get("quality_score", 100.0),
+            issues=issues,
+        )
+
+    # Recompute from file (for legacy datasets or forced recompute)
     records = load_dataset_records(dataset.file_path, dataset.file_format)
 
     if not records:
         raise HTTPException(status_code=400, detail="Dataset is empty")
 
-    # Check for issues
-    issues = _check_quality_issues(records)
+    qstats = compute_quality_statistics(records)
 
-    # Calculate quality score (100 - penalty for each issue type)
-    total_issues = sum(issue.count for issue in issues)
-    issue_ratio = total_issues / len(records)
-    quality_score = max(0, 100 - issue_ratio * 100)
+    # Update cached quality stats in database
+    dataset.quality_stats = qstats
+    repo.update(dataset)
+
+    # Convert to QualityIssue objects for response
+    issues = [
+        QualityIssue(
+            issue_type=issue["issue_type"],
+            count=issue["count"],
+            percentage=issue["percentage"],
+            sample_indices=issue["sample_indices"],
+        )
+        for issue in qstats["issues"]
+    ]
 
     return QualityCheckResponse(
-        total_samples=len(records),
-        issues_found=total_issues,
-        quality_score=round(quality_score, 1),
+        total_samples=qstats["total_samples"],
+        issues_found=qstats["issues_found"],
+        quality_score=qstats["quality_score"],
         issues=issues,
     )
 
@@ -1026,7 +1156,7 @@ async def reanalyze_dataset(
     auto_detect_labels: bool = Query(False, description="Re-detect label fields automatically"),
     session: Session = Depends(get_session),
 ):
-    """Reanalyze a dataset to update distributions."""
+    """Reanalyze a dataset to update distributions, statistics, and quality."""
     repo = TrainingDatasetRepository(session)
     dataset = repo.get_by_uuid(uuid)
 
@@ -1044,8 +1174,10 @@ async def reanalyze_dataset(
     if auto_detect_labels:
         dataset.label_fields = detect_label_fields(records)
 
-    # Recompute distributions
+    # Recompute all analytics
     dataset.field_distributions = compute_field_distributions(records, dataset.label_fields)
+    dataset.statistics = compute_dataset_statistics(records)
+    dataset.quality_stats = compute_quality_statistics(records)
     dataset.analyzed_at = datetime.utcnow()
 
     dataset = repo.update(dataset)

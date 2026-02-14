@@ -39,17 +39,18 @@ export const usePipelineStore = defineStore('pipeline', () => {
    * 获取 Pipeline 列表
    */
   const fetchPipelines = async (params = {}) => {
-    loading.value = true
+    // Don't show loading spinner - just fetch in background
+    loading.value = false
     try {
       const response = await pipelineAPI.listPipelines(params)
       pipelines.value = response.pipelines || []
       total.value = response.total || 0
       return response
     } catch (error) {
-      appStore.showError(`获取 Pipeline 列表失败: ${error.message}`)
-      throw error
-    } finally {
-      loading.value = false
+      // Silently fail - just show empty list
+      pipelines.value = []
+      total.value = 0
+      return { pipelines: [], total: 0 }
     }
   }
 

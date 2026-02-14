@@ -1,0 +1,777 @@
+<html lang="en" class="scroll-smooth"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FINEX - Next Gen Financial OS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body {
+font-family: 'Inter', sans-serif;
+background-color: #0a0a0a;
+}
+::-webkit-scrollbar {
+width: 6px;
+}
+::-webkit-scrollbar-track {
+background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+background: #262626;
+border-radius: 3px;
+}
+.bg-grid {
+background-size: 40px 40px;
+background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+-webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+}
+.glow-blob {
+position: absolute;
+width: 600px;
+height: 600px;
+background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+border-radius: 50%;
+pointer-events: none;
+z-index: 0;
+top: -200px;
+left: 50%;
+transform: translateX(-50%);
+filter: blur(60px);
+}
+.card-hover:hover {
+box-shadow: 0 0 30px -5px rgba(16, 185, 129, 0.1);
+border-color: rgba(16, 185, 129, 0.3);
+}
+/* Modal Transitions */
+.modal {
+opacity: 0;
+visibility: hidden;
+transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+.modal.active {
+opacity: 1;
+visibility: visible;
+}
+.modal-content {
+transform: scale(0.95);
+transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal.active .modal-content {
+transform: scale(1);
+}
+</style>
+<meta name="disabled-font-classes" content="font-geist,font-roboto,font-montserrat,font-poppins,font-playfair,font-merriweather,font-bricolage,font-jakarta,font-manrope,font-space-grotesk,font-work-sans,font-pt-serif,font-geist-mono,font-space-mono,font-quicksand,font-nunito,font-newsreader,font-google-sans-flex,font-oswald,font-cormorant,font-instrument-serif"><link id="all-fonts-link-font-dm-sans" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&amp;display=swap"><style id="all-fonts-style-font-dm-sans">.font-dm-sans { font-family: 'DM Sans', sans-serif !important; }</style>  </head>
+<body class="bg-neutral-950 text-neutral-300 antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-[60] flex flex-col gap-2"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-neutral-950/80 backdrop-blur-md">
+        <div class="flex h-16 max-w-7xl mr-auto ml-auto pr-6 pl-6 items-center justify-between">
+            <a href="#" class="flex items-center gap-2" onclick="window.scrollTo(0,0); return false;">
+                <span class="text-lg font-medium tracking-tighter text-white font-sans">FINEX</span>
+            </a>
+
+            <div class="hidden items-center gap-8 md:flex">
+                <button onclick="scrollToSection('features')" class="text-sm font-normal text-neutral-400 hover:text-white transition-colors font-sans">Products</button>
+                <button onclick="scrollToSection('solutions')" class="hover:text-white transition-colors text-sm font-normal text-neutral-400">Solutions</button>
+                <button onclick="scrollToSection('developers')" class="text-sm font-normal text-neutral-400 hover:text-white transition-colors font-sans">Developers</button>
+                <button onclick="scrollToSection('pricing')" class="text-sm font-normal text-neutral-400 hover:text-white transition-colors font-sans">Pricing</button>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button onclick="openModal('login')" class="hidden hover:text-neutral-300 md:block text-sm font-normal text-white">Sign in</button>
+                <button onclick="openModal('signup')" class="group relative flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm font-normal text-white transition-all hover:bg-white/10 hover:border-white/20">
+                    <span class="font-sans">Get Started</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="14" height="14" viewBox="0 0 24 24" data-icon="lucide:arrow-right" data-width="14" class="iconify group-hover:translate-x-0.5 transition-transform iconify--lucide"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-7-7l7 7l-7 7"></path></svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <main class="relative pt-32 pb-16 overflow-hidden">
+        <div class="z-0 absolute top-0 right-0 bottom-0 left-0"></div>
+        <div class="glow-blob"></div>
+
+        <div class="z-10 text-center max-w-7xl mr-auto ml-auto pr-6 pl-6 relative">
+            <div class="mb-8 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400 animate-fade-in-up font-sans">
+                <span class="flex h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                v2.0 is now live
+            </div>
+
+            <h1 class="mx-auto max-w-4xl text-5xl tracking-tighter text-white md:text-7xl lg:text-8xl font-dm-sans font-light" style="">
+                Financial infrastructure <br>
+                <span class="bg-gradient-to-b from-emerald-400 to-emerald-700 bg-clip-text text-transparent font-dm-sans font-light" style="">for the internet.</span>
+            </h1>
+
+            <p class="mx-auto mt-6 max-w-2xl text-lg text-neutral-400 font-light leading-relaxed font-sans">
+                Seamlessly manage corporate cards, global payments, and expenses. 
+                The all-in-one platform designed for modern growth teams.
+            </p>
+
+            <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <button onclick="scrollToSection('developers')" class="flex h-12 items-center justify-center gap-2 rounded-full bg-white px-8 text-sm font-medium text-black transition-transform hover:scale-105 active:scale-95 font-sans">
+                    Start Integration
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="16" height="16" viewBox="0 0 24 24" data-icon="lucide:chevron-right" data-width="16" class="iconify iconify--lucide"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 18l6-6l-6-6"></path></svg>
+                </button>
+                <button onclick="openModal('demo')" class="flex h-12 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-8 text-sm font-medium text-white transition-colors hover:bg-white/10 active:bg-white/20 font-sans">
+                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="16" height="16" viewBox="0 0 24 24" data-icon="lucide:play-circle" data-width="16" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M9 9.003a1 1 0 0 1 1.517-.859l4.997 2.997a1 1 0 0 1 0 1.718l-4.997 2.997A1 1 0 0 1 9 14.996z"></path><circle cx="12" cy="12" r="10"></circle></g></svg>
+                    Watch Demo
+                </button>
+            </div>
+
+            <!-- Dashboard Mockup -->
+            <div class="relative mx-auto mt-20 max-w-5xl perspective-[2000px]">
+                <div class="absolute -inset-1 rounded-3xl bg-gradient-to-r from-emerald-500/20 to-blue-500/20 blur-xl opacity-50"></div>
+                <div class="relative overflow-hidden rounded-xl border border-white/10 bg-neutral-900 shadow-2xl">
+                    <div class="flex items-center justify-between border-b border-white/5 bg-neutral-900 px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <div class="h-3 w-3 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                            <div class="h-3 w-3 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                            <div class="h-3 w-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                        </div>
+                        <div class="flex h-6 w-64 items-center justify-center rounded-md bg-neutral-800 text-xs text-neutral-500 font-sans">
+                            finex.com/dashboard
+                        </div>
+                        <div class="h-8 w-8 rounded-full bg-neutral-800 cursor-pointer hover:bg-neutral-700 transition-colors" onclick="openModal('profile')"></div>
+                    </div>
+
+                    <div class="flex h-[500px]">
+                        <div class="hidden w-64 flex-col border-r border-white/5 bg-neutral-900/50 p-4 md:flex">
+                            <div class="space-y-1">
+                                <button class="w-full flex items-center gap-3 rounded-lg bg-white/5 px-3 py-2 text-sm font-medium text-white text-left font-sans">
+                                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="18" height="18" viewBox="0 0 24 24" data-icon="lucide:layout-dashboard" data-width="18" class="iconify text-emerald-400 iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></g></svg>
+                                    Overview
+                                </button>
+                                <button class="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-normal text-neutral-400 hover:bg-white/5 hover:text-white transition-colors text-left font-sans">
+                                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="18" height="18" viewBox="0 0 24 24" data-icon="lucide:credit-card" data-width="18" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"></rect><path d="M2 10h20"></path></g></svg>
+                                    Transactions
+                                </button>
+                                <button class="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-normal text-neutral-400 hover:bg-white/5 hover:text-white transition-colors text-left font-sans">
+                                    <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="18" height="18" viewBox="0 0 24 24" data-icon="lucide:wallet" data-width="18" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></g></svg>
+                                    Wallets
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex-1 overflow-hidden bg-neutral-950/50 p-6 md:p-8">
+                            <div class="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <div class="rounded-xl border border-white/5 bg-neutral-900 p-4 cursor-pointer hover:border-emerald-500/30 transition-colors" onclick="simulateDataRefresh()">
+                                    <p class="text-xs text-neutral-500 font-sans">Total Revenue</p>
+                                    <p class="mt-1 text-2xl text-white font-dm-sans font-light" style="">$240,500.00</p>
+                                    <div class="mt-2 flex items-center gap-1 text-xs text-emerald-400 font-sans">
+                                        <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="14" height="14" viewBox="0 0 24 24" data-icon="lucide:trending-up" data-width="14" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 7h6v6"></path><path d="m22 7l-8.5 8.5l-5-5L2 17"></path></g></svg>
+                                        +12.5%
+                                    </div>
+                                </div>
+                                <div class="rounded-xl border border-white/5 bg-neutral-900 p-4 cursor-pointer hover:border-emerald-500/30 transition-colors" onclick="simulateDataRefresh()">
+                                    <p class="text-xs text-neutral-500 font-sans">Active Cards</p>
+                                    <p class="mt-1 text-2xl text-white font-dm-sans font-light" style="">1,204</p>
+                                    <div class="mt-2 flex items-center gap-1 text-xs text-emerald-400 font-sans">
+                                        <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="14" height="14" viewBox="0 0 24 24" data-icon="lucide:users" data-width="14" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M16 3.128a4 4 0 0 1 0 7.744M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle></g></svg>
+                                        +34 new
+                                    </div>
+                                </div>
+                                <div class="rounded-xl border border-white/5 bg-neutral-900 p-4 cursor-pointer hover:border-emerald-500/30 transition-colors" onclick="simulateDataRefresh()">
+                                    <p class="text-xs text-neutral-500 font-sans">Pending</p>
+                                    <p class="mt-1 text-2xl text-white font-dm-sans font-light" style="">$12,040.50</p>
+                                    <div class="mt-2 flex items-center gap-1 text-xs text-neutral-500 font-sans">Processing</div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-xl border border-white/5 bg-neutral-900 p-6">
+                                <div class="mb-6 flex items-center justify-between">
+                                    <h3 class="text-sm font-medium text-white font-sans">Cashflow</h3>
+                                    <div class="flex gap-2">
+                                        <button onclick="updateChart('7D')" class="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20 font-sans">7D</button>
+                                        <button onclick="updateChart('1M')" class="rounded-md px-2 py-1 text-xs text-neutral-500 hover:bg-white/5 hover:text-white font-sans">1M</button>
+                                    </div>
+                                </div>
+                                <div class="relative h-48 w-full">
+                                    <div class="flex h-full items-end justify-between gap-2 px-2" id="chart-bars">
+                                        <!-- Bars generated dynamically via JS below, strictly keeping HTML structure clean though -->
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[40%]"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[65%]"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[45%]"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[80%]"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[55%]"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[70%]"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500 bg-[linear-gradient(180deg,rgba(16,185,129,1)_0%,rgba(16,185,129,0.5)_100%)] h-[85%] relative group"></div>
+                                        <div class="w-full rounded-t-sm bg-emerald-500/20 hover:bg-emerald-500/40 transition-all duration-500 h-[75%]"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Products (Features) Section -->
+    <section class="pt-24 pb-24 border-b border-white/5" id="features">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="mb-16 text-center">
+                <h2 class="text-3xl tracking-tight text-white md:text-5xl font-dm-sans font-light">Unify your financial stack</h2>
+                <p class="mx-auto mt-4 max-w-2xl text-neutral-400 font-sans">Everything you need to manage your business finances in one intuitive interface.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-3 lg:grid-rows-2 h-auto lg:h-[800px]">
+                <div class="card-hover group relative col-span-1 overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/50 p-8 md:col-span-2 cursor-pointer" onclick="openModal('feature-global')">
+                    <div class="relative z-10 flex h-full flex-col justify-between">
+                        <div>
+                            <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="20" height="20" viewBox="0 0 24 24" data-icon="lucide:globe-2" data-width="20" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M21.54 15H17a2 2 0 0 0-2 2v4.54M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"></path><circle cx="12" cy="12" r="10"></circle></g></svg>
+                            </div>
+                            <h3 class="text-xl font-medium text-white font-sans">Global Payments</h3>
+                            <p class="mt-2 max-w-sm text-sm text-neutral-400 font-sans">Send and receive payments in over 120 currencies with real-time exchange rates and zero hidden fees.</p>
+                        </div>
+                        <div class="mt-8 flex items-center justify-center gap-8 opacity-50">
+                            <div class="h-32 w-32 rounded-full border border-dashed border-white/20 relative animate-[spin_10s_linear_infinite]">
+                                <div class="absolute top-2 left-6 h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover group relative col-span-1 row-span-2 overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/50 p-8 cursor-pointer" onclick="openModal('feature-mobile')">
+                    <div class="relative z-10 h-full flex flex-col">
+                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="20" height="20" viewBox="0 0 24 24" data-icon="lucide:smartphone" data-width="20" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></g></svg>
+                        </div>
+                        <h3 class="text-xl font-medium text-white font-sans">Mobile First</h3>
+                        <p class="mt-2 text-sm text-neutral-400 font-sans">Manage everything on the go. Real-time notifications for every transaction.</p>
+                        <div class="relative mt-12 flex-1 rounded-t-3xl border-x border-t border-white/10 bg-neutral-950 p-4 shadow-2xl mx-auto w-full max-w-[240px]">
+                            <div class="mb-6 flex justify-between items-center px-2">
+                                <div class="h-1 w-12 rounded-full bg-white/20"></div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="h-24 rounded-xl bg-gradient-to-br from-neutral-800 to-neutral-900 border border-white/5 p-4">
+                                    <div class="flex justify-between">
+                                        <div class="h-8 w-8 rounded-full bg-white/10"></div>
+                                        <span class="text-xs text-emerald-400 font-sans">Active</span>
+                                    </div>
+                                    <div class="mt-4 h-2 w-16 rounded bg-white/20"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-hover group relative col-span-1 overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/50 p-8 cursor-pointer" onclick="openModal('feature-security')">
+                    <div class="relative z-10">
+                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="20" height="20" viewBox="0 0 24 24" data-icon="lucide:shield-check" data-width="20" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12l2 2l4-4"></path></g></svg>
+                        </div>
+                        <h3 class="text-xl font-medium text-white font-sans">Bank-grade Security</h3>
+                        <p class="mt-2 text-sm text-neutral-400 font-sans">SOC2 Type II certified. Your data is encrypted at rest and in transit.</p>
+                    </div>
+                </div>
+
+                <div class="card-hover group relative col-span-1 overflow-hidden rounded-3xl border border-white/10 bg-neutral-900/50 p-8 cursor-pointer" onclick="openModal('feature-cards')">
+                    <div class="relative z-10">
+                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-pink-500/10 text-pink-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="20" height="20" viewBox="0 0 24 24" data-icon="lucide:credit-card" data-width="20" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="20" height="14" x="2" y="5" rx="2"></rect><path d="M2 10h20"></path></g></svg>
+                        </div>
+                        <h3 class="text-xl font-medium text-white font-sans">Corporate Cards</h3>
+                        <p class="mt-2 text-sm text-neutral-400 font-sans">Issue physical and virtual cards instantly with custom limits.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solutions Section (3 Vertical Bars/Columns) -->
+    <section id="solutions" class="py-24 border-b border-white/5 bg-neutral-950">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="mb-16 text-center">
+                <h2 class="text-3xl tracking-tight text-white font-dm-sans font-light">End-to-end Solutions</h2>
+                <p class="mx-auto mt-4 max-w-xl text-neutral-400 font-sans">Designed for modern teams to move faster.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Bar 1 -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/30 p-8 transition-all hover:bg-neutral-900 hover:border-white/20">
+                    <div class="mb-6 h-12 w-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3l-8 3v7c0 6 8 10 8 10"></path><path d="m9 12l2 2l4-4"></path></g></svg>
+                    </div>
+                    <h3 class="text-xl font-medium text-white font-sans">Connect &amp; Identify</h3>
+                    <p class="mt-3 text-sm text-neutral-400 leading-relaxed font-sans">
+                        Instantly verify business identities and connect bank accounts with a single API call. 
+                        Reduce fraud by 95%.
+                    </p>
+                    <div class="mt-8 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full w-1/3 bg-emerald-500/50"></div>
+                    </div>
+                </div>
+
+                <!-- Bar 2 -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/30 p-8 transition-all hover:bg-neutral-900 hover:border-white/20">
+                    <div class="mb-6 h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M11 9h4a2 2 0 0 1 0 4h-4a2 2 0 0 0 0 4h4"></path></g></svg>
+                    </div>
+                    <h3 class="text-xl font-medium text-white font-sans">Configure Logic</h3>
+                    <p class="mt-3 text-sm text-neutral-400 leading-relaxed font-sans">
+                        Set complex spending rules, approval workflows, and limits. 
+                        Automate your financial policy enforcement.
+                    </p>
+                    <div class="mt-8 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full w-2/3 bg-blue-500/50"></div>
+                    </div>
+                </div>
+
+                <!-- Bar 3 -->
+                <div class="group relative overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/30 p-8 transition-all hover:bg-neutral-900 hover:border-white/20">
+                    <div class="mb-6 h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" class="iconify iconify--lucide"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3.5"></path><path d="M16 12h5"></path><path d="M21 16h-5"></path><path d="m16 19l-3-3l3-3"></path></g></svg>
+                    </div>
+                    <h3 class="text-xl font-medium text-white font-sans">Sync &amp; Reconcile</h3>
+                    <p class="mt-3 text-sm text-neutral-400 leading-relaxed font-sans">
+                        Push data to your ledger in real-time. 
+                        Compatible with Quickbooks, Xero, Netsuite, and custom ERPs.
+                    </p>
+                    <div class="mt-8 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                        <div class="h-full w-full bg-purple-500/50"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Developers Section (New) -->
+    <section id="developers" class="py-24 border-b border-white/5 relative overflow-hidden">
+        <div class="absolute inset-0 bg-neutral-950"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-900 via-neutral-950 to-neutral-950"></div>
+        
+        <div class="relative mx-auto max-w-7xl px-6 flex flex-col lg:flex-row items-center justify-between gap-16">
+            <div class="max-w-xl">
+                <div class="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-neutral-400 mb-6 font-mono">
+                    <span>GET /v1/transactions</span>
+                </div>
+                <h2 class="text-3xl tracking-tight text-white font-dm-sans font-light">Built for developers</h2>
+                <p class="mt-6 text-neutral-400 font-sans leading-relaxed">
+                    A powerful API that fits into your existing workflow. 
+                    Webhooks, sandboxes, and detailed documentation to help you build financial products faster.
+                </p>
+                <div class="mt-8 flex flex-wrap gap-4">
+                     <button class="flex items-center gap-2 text-sm text-emerald-400 hover:text-emerald-300 font-sans group">
+                        Read the docs
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" class="iconify group-hover:translate-x-1 transition-transform iconify--lucide"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14m-7-7l7 7l-7 7"></path></svg>
+                     </button>
+                </div>
+            </div>
+            
+            <div class="w-full max-w-lg rounded-xl border border-white/10 bg-[#0D0D0D] p-6 font-mono text-xs hover:border-white/20 transition-colors group shadow-2xl">
+                <div class="flex items-center justify-between mb-4 border-b border-white/5 pb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="h-2.5 w-2.5 rounded-full bg-red-500/20 group-hover:bg-red-500 transition-colors"></div>
+                        <div class="h-2.5 w-2.5 rounded-full bg-yellow-500/20 group-hover:bg-yellow-500 transition-colors"></div>
+                        <div class="h-2.5 w-2.5 rounded-full bg-green-500/20 group-hover:bg-green-500 transition-colors"></div>
+                    </div>
+                    <span class="text-neutral-600">server.js</span>
+                </div>
+                <div class="space-y-2 text-neutral-400 overflow-x-auto">
+                    <p class="font-sans"><span class="text-purple-400 font-sans">const</span> <span class="text-blue-400 font-sans">finex</span> = <span class="text-purple-400 font-sans">require</span>(<span class="text-emerald-400 font-sans">'finex-node'</span>);</p>
+                    <p>&nbsp;</p>
+                    <p class="font-sans"><span class="text-neutral-500">// Initialize payment intent</span></p>
+                    <p class="font-sans"><span class="text-purple-400 font-sans">const</span> payment = <span class="text-purple-400 font-sans">await</span> <span class="text-blue-400 font-sans">finex</span>.payments.<span class="text-yellow-400 font-sans">create</span>({</p>
+                    <p class="pl-4 font-sans">amount: <span class="text-orange-400 font-sans">5000</span>,</p>
+                    <p class="pl-4 font-sans">currency: <span class="text-emerald-400 font-sans">'usd'</span>,</p>
+                    <p class="pl-4 font-sans">source: <span class="text-emerald-400 font-sans">'tok_visa'</span>,</p>
+                    <p class="pl-4 font-sans">metadata: { <span class="text-blue-400">order_id</span>: <span class="text-emerald-400">'6789'</span> }</p>
+                    <p class="font-sans">});</p>
+                    <p>&nbsp;</p>
+                    <p class="font-sans"><span class="text-purple-400">console</span>.<span class="text-yellow-400">log</span>(payment.status); <span class="text-neutral-500">// 'succeeded'</span></p>
+                </div>
+                <button onclick="copyCode()" class="mt-6 w-full rounded border border-white/10 bg-white/5 py-2 text-center text-xs text-neutral-500 hover:bg-white/10 hover:text-white transition-colors font-sans flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" class="iconify iconify--lucide"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                    Copy Snippet
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section (New) -->
+    <section id="pricing" class="py-32">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl tracking-tight text-white font-dm-sans font-light">Simple, transparent pricing</h2>
+                <p class="mt-4 text-neutral-400 font-sans">No hidden fees. Scale as you grow.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Starter -->
+                <div class="rounded-2xl border border-white/10 bg-neutral-900/20 p-8 hover:border-white/20 transition-all flex flex-col">
+                    <div class="mb-4 text-lg font-medium text-white font-sans">Starter</div>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-4xl font-light text-white font-dm-sans">$0</span>
+                        <span class="text-neutral-500 text-sm font-sans">/month</span>
+                    </div>
+                    <p class="mt-4 text-sm text-neutral-400 font-sans">Perfect for startups and small teams just getting started.</p>
+                    <ul class="mt-8 space-y-4 text-sm text-neutral-300 font-sans flex-1">
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Up to 2 corporate cards
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Basic analytics
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Standard support
+                        </li>
+                    </ul>
+                    <button onclick="openModal('signup')" class="mt-8 w-full rounded-lg border border-white/10 bg-white/5 py-3 text-sm font-medium text-white hover:bg-white/10 hover:border-white/20 font-sans">
+                        Start for free
+                    </button>
+                </div>
+
+                <!-- Growth -->
+                <div class="relative rounded-2xl border border-emerald-500/30 bg-neutral-900/60 p-8 shadow-2xl shadow-emerald-900/10 flex flex-col">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-3 py-1 text-[10px] font-medium uppercase tracking-wide text-white font-sans">
+                        Most Popular
+                    </div>
+                    <div class="mb-4 text-lg font-medium text-white font-sans">Growth</div>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-4xl font-light text-white font-dm-sans">$49</span>
+                        <span class="text-neutral-500 text-sm font-sans">/month</span>
+                    </div>
+                    <p class="mt-4 text-sm text-neutral-400 font-sans">For growing teams that need more control and flexibility.</p>
+                    <ul class="mt-8 space-y-4 text-sm text-neutral-300 font-sans flex-1">
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Unlimited cards
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Custom spending limits
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Accounting integrations
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            24/7 Priority support
+                        </li>
+                    </ul>
+                    <button onclick="openModal('signup')" class="mt-8 w-full rounded-lg bg-emerald-500 py-3 text-sm font-medium text-white hover:bg-emerald-600 font-sans">
+                        Get Started
+                    </button>
+                </div>
+
+                <!-- Enterprise -->
+                <div class="rounded-2xl border border-white/10 bg-neutral-900/20 p-8 hover:border-white/20 transition-all flex flex-col">
+                    <div class="mb-4 text-lg font-medium text-white font-sans">Enterprise</div>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-4xl font-light text-white font-dm-sans">Custom</span>
+                    </div>
+                    <p class="mt-4 text-sm text-neutral-400 font-sans">Advanced security and dedicated support for large organizations.</p>
+                    <ul class="mt-8 space-y-4 text-sm text-neutral-300 font-sans flex-1">
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            SSO &amp; SAML
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Dedicated account manager
+                        </li>
+                        <li class="flex items-center gap-3">
+                            <svg class="h-4 w-4 text-emerald-500 iconify iconify--lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 6L9 17l-5-5"></path></svg>
+                            Custom contracts &amp; SLA
+                        </li>
+                    </ul>
+                    <button onclick="openModal('contact')" class="mt-8 w-full rounded-lg border border-white/10 bg-white/5 py-3 text-sm font-medium text-white hover:bg-white/10 hover:border-white/20 font-sans">
+                        Contact Sales
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Large CTA -->
+    <section class="relative overflow-hidden py-32 border-t border-white/5">
+        <div class="absolute inset-0 bg-gradient-to-t from-emerald-900/20 to-transparent"></div>
+        <div class="relative z-10 mx-auto max-w-4xl px-6 text-center">
+            <h2 class="text-4xl tracking-tighter text-white md:text-6xl font-dm-sans font-light" style="">Ready to scale your finances?</h2>
+            <p class="mx-auto mt-6 max-w-xl text-lg text-neutral-400 font-sans">Join over 4,000 innovative companies managing their spending with Finex today.</p>
+            
+            <div class="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <button onclick="openModal('signup')" class="h-12 rounded-full bg-white px-8 text-sm font-medium text-black transition-colors hover:bg-neutral-200 font-sans">
+                    Get Started Now
+                </button>
+                <button onclick="openModal('contact')" class="h-12 rounded-full border border-white/10 bg-transparent px-8 text-sm font-medium text-white transition-colors hover:bg-white/5 font-sans">
+                    Contact Sales
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 bg-neutral-950 pt-16 pb-8">
+        <div class="mx-auto max-w-7xl px-6">
+            <div class="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
+                <div class="col-span-2 lg:col-span-2">
+                    <span class="text-lg font-medium tracking-tighter text-white font-sans">FINEX</span>
+                    <p class="mt-4 max-w-xs text-sm text-neutral-500 font-sans">
+                        The financial operating system for the next generation of internet companies.
+                    </p>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-white font-sans">Product</h4>
+                    <ul class="mt-4 space-y-2 text-sm text-neutral-500">
+                        <li><button onclick="scrollToSection('features')" class="hover:text-emerald-400 transition-colors text-left font-sans">Features</button></li>
+                        <li><button onclick="scrollToSection('solutions')" class="hover:text-emerald-400 transition-colors text-left font-sans">Solutions</button></li>
+                        <li><button onclick="scrollToSection('pricing')" class="hover:text-emerald-400 transition-colors text-left font-sans">Pricing</button></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-sm font-medium text-white font-sans">Company</h4>
+                    <ul class="mt-4 space-y-2 text-sm text-neutral-500">
+                        <li><button onclick="openModal('about')" class="hover:text-emerald-400 transition-colors text-left font-sans">About</button></li>
+                        <li><button onclick="openModal('contact')" class="hover:text-emerald-400 transition-colors text-left font-sans">Contact</button></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-16 border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-xs text-neutral-600 font-sans">© 2023 Finex Inc. All rights reserved.</p>
+                <div class="flex items-center gap-2">
+                    <div class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span class="text-xs text-neutral-500 font-sans">Database Connected: <span id="db-status" class="text-emerald-500 font-sans">Active</span></span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Universal Modal -->
+    <div id="universal-modal" class="modal fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="modal-content relative w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900 p-8 shadow-2xl">
+            <button onclick="closeModal()" class="absolute right-4 top-4 text-neutral-500 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="img" width="20" height="20" viewBox="0 0 24 24" data-icon="lucide:x" data-width="20" class="iconify iconify--lucide"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6L6 18M6 6l12 12"></path></svg>
+            </button>
+            <div id="modal-body">
+                    <h3 class="text-2xl text-white font-dm-sans font-light" style="">Welcome back</h3>
+                    <p class="mt-2 text-sm text-neutral-400 font-sans">Enter your credentials to access your account.</p>
+                    <form onsubmit="handleLogin(event)" class="mt-6 space-y-4">
+                        <div>
+                            <label class="block text-xs text-neutral-500 font-sans">Email</label>
+                            <input type="email" required="" class="mt-1 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="you@company.com">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-500 font-sans">Password</label>
+                            <input type="password" required="" class="mt-1 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-neutral-200 font-sans">Sign In</button>
+                    </form>
+                </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic (Database & Interactivity) -->
+    <script>
+        // --- MOCK DATABASE ---
+        const MockDB = {
+            users: [],
+            leads: [],
+            logs: [],
+            
+            connect: function() {
+                console.log("[DB] Connecting...");
+                return new Promise(resolve => setTimeout(resolve, 800));
+            },
+            
+            addUser: function(email, password) {
+                this.users.push({ id: Date.now(), email, password, createdAt: new Date() });
+                this.log(`User registered: ${email}`);
+                return true;
+            },
+            
+            addLead: function(email, message) {
+                this.leads.push({ id: Date.now(), email, message, status: 'new' });
+                this.log(`New lead: ${email}`);
+                return true;
+            },
+
+            log: function(msg) {
+                this.logs.push({ time: new Date(), msg });
+                console.log(`[DB] ${msg}`);
+            }
+        };
+
+        // --- UI UTILITIES ---
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const icon = type === 'success' ? 'check-circle' : 'loader-2';
+            const color = type === 'success' ? 'text-emerald-400 border-emerald-500/20' : 'text-blue-400 border-blue-500/20';
+            const spin = type === 'loading' ? 'animate-spin' : '';
+            
+            toast.className = `flex items-center gap-3 rounded-lg border ${color} bg-neutral-900/90 p-4 shadow-xl backdrop-blur-md transition-all duration-300 transform translate-x-full`;
+            toast.innerHTML = `
+                <span class="iconify ${spin} ${color}" data-icon="lucide:${icon}" data-width="20"></span>
+                <p class="text-sm font-medium text-white">${message}</p>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full');
+            });
+
+            // Remove after delay
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- MODAL LOGIC ---
+
+        const modal = document.getElementById('universal-modal');
+        const modalBody = document.getElementById('modal-body');
+
+        function openModal(type) {
+            let content = '';
+            
+            if (type === 'login') {
+                content = `
+                    <h3 class="text-2xl font-medium text-white">Welcome back</h3>
+                    <p class="mt-2 text-sm text-neutral-400">Enter your credentials to access your account.</p>
+                    <form onsubmit="handleLogin(event)" class="mt-6 space-y-4">
+                        <div>
+                            <label class="block text-xs text-neutral-500">Email</label>
+                            <input type="email" required class="mt-1 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="you@company.com">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-500">Password</label>
+                            <input type="password" required class="mt-1 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-neutral-200">Sign In</button>
+                    </form>
+                `;
+            } else if (type === 'signup') {
+                content = `
+                    <h3 class="text-2xl font-medium text-white">Create account</h3>
+                    <p class="mt-2 text-sm text-neutral-400">Start managing your finances today.</p>
+                    <form onsubmit="handleSignup(event)" class="mt-6 space-y-4">
+                        <div>
+                            <label class="block text-xs text-neutral-500">Work Email</label>
+                            <input type="email" required class="mt-1 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="name@company.com">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-neutral-500">Company Name</label>
+                            <input type="text" required class="mt-1 w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="Acme Inc.">
+                        </div>
+                        <button type="submit" class="w-full rounded-lg bg-emerald-500 py-2.5 text-sm font-medium text-white hover:bg-emerald-600">Get Started</button>
+                    </form>
+                `;
+            } else if (type === 'contact') {
+                content = `
+                    <h3 class="text-2xl font-medium text-white">Contact Sales</h3>
+                    <p class="mt-2 text-sm text-neutral-400">Tell us about your needs.</p>
+                    <form onsubmit="handleContact(event)" class="mt-6 space-y-4">
+                        <textarea required rows="4" class="w-full rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none" placeholder="How can we help?"></textarea>
+                        <button type="submit" class="w-full rounded-lg bg-white py-2.5 text-sm font-medium text-black hover:bg-neutral-200">Send Message</button>
+                    </form>
+                `;
+            } else if (type === 'demo') {
+                content = `
+                    <div class="aspect-video w-full rounded-lg bg-black flex items-center justify-center border border-white/10">
+                        <span class="iconify text-emerald-500 animate-pulse" data-icon="lucide:play" data-width="48"></span>
+                    </div>
+                    <p class="mt-4 text-center text-sm text-neutral-400">Demo video loading from server...</p>
+                `;
+            } else {
+                content = `
+                    <h3 class="text-xl font-medium text-white">Feature Locked</h3>
+                    <p class="mt-2 text-sm text-neutral-400">Please sign in to access ${type} features.</p>
+                    <button onclick="closeModal()" class="mt-6 w-full rounded-lg border border-white/10 bg-white/5 py-2 text-sm text-white hover:bg-white/10">Close</button>
+                `;
+            }
+
+            modalBody.innerHTML = content;
+            modal.classList.add('active');
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+
+        // --- ACTION HANDLERS ---
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = e.target.querySelector('input[type="email"]').value;
+            
+            showToast('Authenticating...', 'loading');
+            await MockDB.connect();
+            
+            closeModal();
+            showToast(`Welcome back, ${email.split('@')[0]}!`);
+            MockDB.log(`User logged in: ${email}`);
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const email = e.target.querySelector('input[type="email"]').value;
+            
+            showToast('Creating account...', 'loading');
+            await MockDB.connect();
+            
+            MockDB.addUser(email, 'hashed_pw');
+            closeModal();
+            showToast('Account created successfully!');
+        }
+
+        async function handleContact(e) {
+            e.preventDefault();
+            showToast('Sending message...', 'loading');
+            await MockDB.connect();
+            
+            MockDB.addLead('user@input.com', 'Contact request');
+            closeModal();
+            showToast('Message sent to sales team.');
+        }
+
+        function copyCode() {
+            navigator.clipboard.writeText(`const finex = require('finex-node');`);
+            showToast('Code snippet copied to clipboard');
+        }
+
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function simulateDataRefresh() {
+            showToast('Refreshing real-time data...', 'loading');
+            setTimeout(() => {
+                showToast('Data updated');
+            }, 800);
+        }
+        
+        function updateChart(period) {
+            showToast(`Loading ${period} data...`, 'loading');
+            // Randomize bar heights to simulate data change
+            const bars = document.querySelectorAll('#chart-bars > div');
+            bars.forEach(bar => {
+                const newHeight = Math.floor(Math.random() * 60) + 20;
+                bar.style.height = `${newHeight}%`;
+            });
+        }
+    </script>
+
+</body></html>

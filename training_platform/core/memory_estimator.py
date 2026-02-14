@@ -46,13 +46,21 @@ class ModelConfig:
     def from_model_size(cls, size: str) -> "ModelConfig":
         """Create config from model size string like '7B', '14B', etc."""
         configs = {
+            # Qwen 系列
             "0.5B": cls("Qwen2.5-0.5B", 0.5, 896, 24, 14, 4864),
+            "0.6B": cls("Qwen2.5-0.6B", 0.6, 1024, 24, 16, 5504),
             "1.5B": cls("Qwen2.5-1.5B", 1.5, 1536, 28, 12, 8960),
             "3B": cls("Qwen2.5-3B", 3, 2048, 36, 16, 11008),
             "7B": cls("Qwen2.5-7B", 7, 3584, 28, 28, 18944),
+            "8B": cls("Llama-3.1-8B", 8, 4096, 32, 32, 14336),
             "14B": cls("Qwen2.5-14B", 14, 5120, 40, 40, 13824),
             "32B": cls("Qwen2.5-32B", 32, 5120, 64, 40, 27648),
+            "70B": cls("Llama-3.1-70B", 70, 8192, 80, 64, 28672),
             "72B": cls("Qwen2.5-72B", 72, 8192, 80, 64, 29568),
+            "110B": cls("Qwen2.5-110B", 110, 10240, 96, 80, 36864),
+            "235B": cls("Qwen2.5-235B", 235, 12288, 120, 96, 49152),
+            "405B": cls("Llama-3.1-405B", 405, 16384, 126, 128, 53248),
+            "671B": cls("DeepSeek-V3-671B", 671, 16384, 160, 128, 65536),
         }
         return configs.get(size, configs["7B"])
 
@@ -70,15 +78,28 @@ class GPUConfig:
     def from_gpu_type(cls, gpu_type: str) -> "GPUConfig":
         """Create config from GPU type string"""
         configs = {
-            # NVIDIA GPUs (CUDA backend)
+            # Consumer GPUs (CUDA backend)
+            "RTX3090": cls("RTX3090", 24, 936, 71),
+            "RTX4080": cls("RTX4080", 16, 717, 65),
+            "RTX4090": cls("RTX4090", 24, 1008, 82.6),
+            "RTX5090": cls("RTX5090", 32, 1792, 209),
+            # Data Center GPUs - A-series
             "A100-40G": cls("A100-40G", 40, 1555, 312),
             "A100-80G": cls("A100-80G", 80, 2039, 312),
+            "A800-80G": cls("A800-80G", 80, 2039, 312),
+            # Data Center GPUs - H-series (Hopper)
             "H100-80G": cls("H100-80G", 80, 3350, 989),
             "H100-SXM": cls("H100-SXM", 80, 3350, 989),
-            "A800-80G": cls("A800-80G", 80, 2039, 312),
+            "H100-NVL": cls("H100-NVL", 94, 3938, 835),
             "H800-80G": cls("H800-80G", 80, 3350, 989),
-            "RTX4090": cls("RTX4090", 24, 1008, 82.6),
+            "H200-141G": cls("H200-141G", 141, 4800, 989),
+            # Data Center GPUs - L-series
+            "L40": cls("L40", 48, 864, 181),
             "L40S": cls("L40S", 48, 864, 362),
+            # Data Center GPUs - B-series (Blackwell)
+            "B100": cls("B100", 192, 8000, 1800),
+            "B200": cls("B200", 192, 8000, 2250),
+            "GB200": cls("GB200", 384, 16000, 4500),
             # Apple Silicon (MPS backend) - unified memory architecture
             "M1-Max-32G": cls("M1-Max-32G", 32, 400, 10.4, is_apple_silicon=True),
             "M1-Max-64G": cls("M1-Max-64G", 64, 400, 10.4, is_apple_silicon=True),

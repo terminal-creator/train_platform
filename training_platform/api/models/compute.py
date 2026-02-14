@@ -8,14 +8,28 @@ from enum import Enum
 
 
 class GPUType(str, Enum):
+    # Consumer GPUs
+    RTX3090 = "RTX3090"
+    RTX4080 = "RTX4080"
+    RTX4090 = "RTX4090"
+    RTX5090 = "RTX5090"
+    # Data Center GPUs - NVIDIA A-series
     A100_40G = "A100-40G"
     A100_80G = "A100-80G"
+    A800_80G = "A800-80G"
+    # Data Center GPUs - NVIDIA H-series
     H100_80G = "H100-80G"
     H100_SXM = "H100-SXM"
-    A800_80G = "A800-80G"
+    H100_NVL = "H100-NVL"
     H800_80G = "H800-80G"
-    RTX4090 = "RTX4090"
+    H200_141G = "H200-141G"
+    # Data Center GPUs - NVIDIA L-series
+    L40 = "L40"
     L40S = "L40S"
+    # Data Center GPUs - NVIDIA B-series (Blackwell)
+    B100 = "B100"
+    B200 = "B200"
+    GB200 = "GB200"
     # Apple Silicon (MPS backend)
     M1_MAX_32G = "M1-Max-32G"
     M1_MAX_64G = "M1-Max-64G"
@@ -26,17 +40,25 @@ class GPUType(str, Enum):
     M3_MAX_36G = "M3-Max-36G"
     M3_MAX_128G = "M3-Max-128G"
     M4_MAX_36G = "M4-Max-36G"
+    M4_MAX_48G = "M4-Max-48G"
     M4_MAX_128G = "M4-Max-128G"
 
 
 class ModelSize(str, Enum):
     B05 = "0.5B"
+    B06 = "0.6B"
     B15 = "1.5B"
     B3 = "3B"
     B7 = "7B"
+    B8 = "8B"
     B14 = "14B"
     B32 = "32B"
+    B70 = "70B"
     B72 = "72B"
+    B110 = "110B"
+    B235 = "235B"
+    B405 = "405B"
+    B671 = "671B"
 
 
 class TrainingType(str, Enum):

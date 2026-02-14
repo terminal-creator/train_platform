@@ -110,10 +110,10 @@
       </template>
 
       <el-table
-        v-loading="taskStore.loading"
         :data="taskStore.tasks"
         stripe
         style="width: 100%"
+        empty-text="暂无任务数据"
       >
         <el-table-column prop="task_id" label="Task ID" width="280">
           <template #default="{ row }">
@@ -236,8 +236,9 @@ const stateFilter = ref('')
 const resultDialogVisible = ref(false)
 const currentTaskResult = ref(null)
 
-// Auto refresh interval
+// Auto refresh interval - disabled by default to avoid timeout issues
 let refreshInterval = null
+const autoRefreshEnabled = ref(false)
 
 // Methods
 const fetchTasks = async () => {
@@ -307,9 +308,11 @@ const getTaskIconComponent = (state) => {
 }
 
 const startAutoRefresh = () => {
+  if (!autoRefreshEnabled.value) return
+  stopAutoRefresh()
   refreshInterval = setInterval(() => {
     handleRefresh()
-  }, 10000) // Refresh every 10 seconds
+  }, 30000) // Refresh every 30 seconds (less aggressive)
 }
 
 const stopAutoRefresh = () => {
@@ -320,8 +323,8 @@ const stopAutoRefresh = () => {
 }
 
 onMounted(async () => {
+  // Load once on mount, no auto-refresh to avoid timeout issues
   await handleRefresh()
-  startAutoRefresh()
 })
 
 onUnmounted(() => {

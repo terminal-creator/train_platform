@@ -39,10 +39,10 @@
 
     <!-- Pipeline Table -->
     <el-table
-      v-loading="pipelineStore.loading"
       :data="filteredPipelines"
       stripe
       style="width: 100%"
+      empty-text="暂无 Pipeline 数据"
     >
       <el-table-column prop="name" label="名称" min-width="200">
         <template #default="{ row }">

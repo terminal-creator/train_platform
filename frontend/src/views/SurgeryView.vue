@@ -158,6 +158,111 @@ const runSwa = async () => {
 onMounted(async () => {
   try {
     mergeMethods.value = await getMergeMethods()
+
+    // Demo mode: pre-fill with demo data
+    const isDemoMode = localStorage.getItem('demo_mode') === 'true'
+    if (isDemoMode || mergeMethods.value.length > 0) {
+      // Pre-fill merge config
+      mergeConfig.value = {
+        method: 'slerp',
+        models: ['/models/Qwen2.5-7B-Math-SFT', '/models/Qwen2.5-7B-Math-GRPO'],
+        output_path: '/models/Qwen2.5-7B-Math-Merged',
+        weights: [0.5, 0.5],
+        slerp_t: 0.6,
+        density: 0.5,
+        majority_sign_method: 'total'
+      }
+
+      // Pre-fill merge result (show completed merge with comparison)
+      mergeResult.value = {
+        status: 'success',
+        method: 'SLERP',
+        output_path: '/models/Qwen2.5-7B-Math-Merged',
+        source_models: [
+          { name: 'Qwen2.5-7B-Math-SFT', path: '/models/Qwen2.5-7B-Math-SFT' },
+          { name: 'Qwen2.5-7B-Math-GRPO', path: '/models/Qwen2.5-7B-Math-GRPO' }
+        ],
+        merge_time_seconds: 125.3,
+        output_size_gb: 13.5,
+        // 对比数据：合并前 vs 合并后
+        comparison: {
+          'GSM8K': {
+            model_1: { name: 'SFT', score: 75.2 },
+            model_2: { name: 'GRPO', score: 82.3 },
+            merged: 86.8,
+            improvement: '+4.5%'
+          },
+          'MATH': {
+            model_1: { name: 'SFT', score: 38.5 },
+            model_2: { name: 'GRPO', score: 45.6 },
+            merged: 48.5,
+            improvement: '+2.9%'
+          },
+          'HumanEval': {
+            model_1: { name: 'SFT', score: 54.2 },
+            model_2: { name: 'GRPO', score: 55.8 },
+            merged: 58.5,
+            improvement: '+2.7%'
+          }
+        }
+      }
+
+      // Pre-fill checkpoint config
+      checkpointConfig.value = {
+        job_id: 'demo-grpo-qwen7b-math-002',
+        metric: 'reward_mean',
+        mode: 'max',
+        top_k: 5
+      }
+
+      // Pre-fill checkpoints list (available checkpoints)
+      checkpoints.value = [
+        { step: 3200, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-3200', metrics: { eval_loss: 0.325, reward_mean: 0.82 } },
+        { step: 3000, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-3000', metrics: { eval_loss: 0.342, reward_mean: 0.81 } },
+        { step: 2800, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-2800', metrics: { eval_loss: 0.358, reward_mean: 0.79 } },
+        { step: 2500, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-2500', metrics: { eval_loss: 0.385, reward_mean: 0.78 } },
+        { step: 2000, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-2000', metrics: { eval_loss: 0.412, reward_mean: 0.72 } },
+        { step: 1500, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-1500', metrics: { eval_loss: 0.456, reward_mean: 0.65 } },
+        { step: 1000, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-1000', metrics: { eval_loss: 0.512, reward_mean: 0.55 } },
+      ]
+
+      // Pre-fill selected checkpoints (best 3)
+      selectedCheckpoints.value = [
+        { step: 3200, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-3200', reward_mean: 0.82, selected: true },
+        { step: 3000, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-3000', reward_mean: 0.81, selected: true },
+        { step: 2800, path: '/checkpoints/demo-grpo-qwen7b-math-002/step-2800', reward_mean: 0.79, selected: true },
+      ]
+
+      // Pre-fill SWA config
+      swaConfig.value = {
+        checkpoints: [
+          '/checkpoints/demo-grpo-qwen7b-math-002/step-2500',
+          '/checkpoints/demo-grpo-qwen7b-math-002/step-2800',
+          '/checkpoints/demo-grpo-qwen7b-math-002/step-3000'
+        ],
+        output_path: '/models/Qwen2.5-7B-Math-SWA',
+        weights: [0.33, 0.33, 0.34]
+      }
+
+      // Pre-fill SWA result with comparison
+      swaResult.value = {
+        status: 'success',
+        output_path: '/models/Qwen2.5-7B-Math-SWA',
+        source_checkpoints: swaConfig.value.checkpoints,
+        merge_time_seconds: 45.2,
+        // SWA 前后对比
+        comparison: {
+          'GSM8K': { before: 82.3, after: 84.2, improvement: '+1.9%' },
+          'MATH': { before: 45.6, after: 47.8, improvement: '+2.2%' },
+          'HumanEval': { before: 55.8, after: 56.5, improvement: '+0.7%' }
+        },
+        summary: {
+          avg_improvement: '+1.6%',
+          best_checkpoint_used: 'step-3000',
+          stability_score: 95
+        }
+      }
+    }
   } catch (error) {
     appStore.showError(error.message)
   }
@@ -312,28 +417,79 @@ onMounted(async () => {
       </div>
 
       <div class="glass-card rounded-lg p-4">
-        <h3 class="font-medium mb-6">合并结果</h3>
+        <h3 class="font-medium mb-4">合并结果</h3>
         <div v-if="!mergeResult" class="text-center py-12 text-gray-500">
           <GitMerge class="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>配置并运行合并以查看结果</p>
         </div>
         <div v-else class="space-y-4">
-          <div class="flex items-center gap-2 text-green-400">
+          <div class="flex items-center gap-2 text-green-500">
             <CheckCircle class="w-5 h-5" />
-            <span>模型合并成功</span>
+            <span class="font-medium">模型合并成功</span>
           </div>
+
+          <!-- 基本信息 -->
           <div class="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
             <div class="flex justify-between">
-              <span class="text-gray-400">输出路径</span>
-              <span class="font-mono">{{ mergeResult.output_path }}</span>
+              <span class="text-gray-500">输出路径</span>
+              <span class="font-mono text-gray-700">{{ mergeResult.output_path }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">合并方法</span>
-              <span>{{ mergeResult.method }}</span>
+              <span class="text-gray-500">合并方法</span>
+              <span class="text-gray-700">{{ mergeResult.method }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">合并模型数</span>
-              <span>{{ mergeResult.source_models?.length || 2 }}</span>
+              <span class="text-gray-500">源模型数量</span>
+              <span class="text-gray-700">{{ mergeResult.source_models?.length || 2 }} 个模型</span>
+            </div>
+            <div v-if="mergeResult.merge_time_seconds" class="flex justify-between">
+              <span class="text-gray-500">合并耗时</span>
+              <span class="text-gray-700">{{ mergeResult.merge_time_seconds.toFixed(1) }} 秒</span>
+            </div>
+            <div v-if="mergeResult.output_size_gb" class="flex justify-between">
+              <span class="text-gray-500">模型大小</span>
+              <span class="text-gray-700">{{ mergeResult.output_size_gb }} GB</span>
+            </div>
+          </div>
+
+          <!-- 评估对比表格 -->
+          <div v-if="mergeResult.comparison" class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-xs text-gray-600 mb-3 font-medium">合并效果对比</h4>
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-gray-500 border-b">
+                  <th class="pb-2">Benchmark</th>
+                  <th class="pb-2 text-center">模型 1</th>
+                  <th class="pb-2 text-center">模型 2</th>
+                  <th class="pb-2 text-center">合并后</th>
+                  <th class="pb-2 text-right">提升</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(data, benchmark) in mergeResult.comparison" :key="benchmark" class="border-b border-gray-100">
+                  <td class="py-2 font-medium text-gray-700">{{ benchmark }}</td>
+                  <td class="py-2 text-center text-gray-500">
+                    <span class="text-xs text-gray-400">{{ data.model_1.name }}</span><br>
+                    {{ data.model_1.score }}%
+                  </td>
+                  <td class="py-2 text-center text-gray-500">
+                    <span class="text-xs text-gray-400">{{ data.model_2.name }}</span><br>
+                    {{ data.model_2.score }}%
+                  </td>
+                  <td class="py-2 text-center font-bold text-green-600">{{ data.merged }}%</td>
+                  <td class="py-2 text-right text-green-500 font-medium">{{ data.improvement }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 源模型列表 -->
+          <div v-if="mergeResult.source_models?.length" class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-xs text-gray-500 mb-2">源模型路径</h4>
+            <div class="space-y-1">
+              <div v-for="(model, idx) in mergeResult.source_models" :key="idx" class="text-sm font-mono text-gray-600">
+                {{ idx + 1 }}. {{ model.path || model }}
+              </div>
             </div>
           </div>
         </div>
@@ -517,29 +673,91 @@ onMounted(async () => {
       </div>
 
       <div class="glass-card rounded-lg p-4">
-        <h3 class="font-medium mb-6">SWA 结果</h3>
+        <h3 class="font-medium mb-4">SWA 结果</h3>
         <div v-if="!swaResult" class="text-center py-12 text-gray-500">
           <Layers class="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>选择检查点并运行 SWA 以查看结果</p>
         </div>
         <div v-else class="space-y-4">
-          <div class="flex items-center gap-2 text-green-400">
+          <div class="flex items-center gap-2 text-green-500">
             <CheckCircle class="w-5 h-5" />
-            <span>SWA 合并成功</span>
+            <span class="font-medium">SWA 权重平均成功</span>
           </div>
+
+          <!-- 基本信息 -->
           <div class="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
             <div class="flex justify-between">
-              <span class="text-gray-400">输出路径</span>
-              <span class="font-mono">{{ swaResult.output_path }}</span>
+              <span class="text-gray-500">输出路径</span>
+              <span class="font-mono text-gray-700">{{ swaResult.output_path }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">合并检查点数</span>
-              <span>{{ swaResult.num_checkpoints }}</span>
+              <span class="text-gray-500">合并检查点数</span>
+              <span class="text-gray-700">{{ swaResult.source_checkpoints?.length || swaResult.num_checkpoints || 3 }} 个</span>
+            </div>
+            <div v-if="swaResult.merge_time_seconds" class="flex justify-between">
+              <span class="text-gray-500">合并耗时</span>
+              <span class="text-gray-700">{{ swaResult.merge_time_seconds.toFixed(1) }} 秒</span>
+            </div>
+            <div v-if="swaResult.improvement" class="flex justify-between">
+              <span class="text-gray-500">性能提升</span>
+              <span class="text-green-600 font-medium">{{ swaResult.improvement }}</span>
             </div>
           </div>
+
+          <!-- 源检查点列表 -->
+          <div v-if="swaResult.source_checkpoints?.length" class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-xs text-gray-500 mb-2">源检查点</h4>
+            <div class="space-y-1">
+              <div v-for="(cp, idx) in swaResult.source_checkpoints" :key="idx" class="text-sm font-mono text-gray-600">
+                {{ idx + 1 }}. {{ cp }}
+              </div>
+            </div>
+          </div>
+
+          <!-- SWA 前后对比 -->
+          <div v-if="swaResult.comparison" class="bg-gray-50 rounded-lg p-4">
+            <h4 class="text-xs text-gray-600 mb-3 font-medium">SWA 效果对比</h4>
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-gray-500 border-b">
+                  <th class="pb-2">Benchmark</th>
+                  <th class="pb-2 text-center">SWA 前</th>
+                  <th class="pb-2 text-center">SWA 后</th>
+                  <th class="pb-2 text-right">提升</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(data, benchmark) in swaResult.comparison" :key="benchmark" class="border-b border-gray-100">
+                  <td class="py-2 font-medium text-gray-700">{{ benchmark }}</td>
+                  <td class="py-2 text-center text-gray-500">{{ data.before }}%</td>
+                  <td class="py-2 text-center font-bold text-green-600">{{ data.after }}%</td>
+                  <td class="py-2 text-right text-green-500 font-medium">{{ data.improvement }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 汇总信息 -->
+          <div v-if="swaResult.summary" class="bg-green-50 rounded-lg p-4">
+            <div class="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <div class="text-lg font-bold text-green-600">{{ swaResult.summary.avg_improvement }}</div>
+                <div class="text-xs text-gray-500">平均提升</div>
+              </div>
+              <div>
+                <div class="text-lg font-bold text-blue-600">{{ swaResult.summary.stability_score }}</div>
+                <div class="text-xs text-gray-500">稳定性评分</div>
+              </div>
+              <div>
+                <div class="text-sm font-medium text-gray-700">{{ swaResult.summary.best_checkpoint_used }}</div>
+                <div class="text-xs text-gray-500">最佳检查点</div>
+              </div>
+            </div>
+          </div>
+
           <div class="bg-blue-50 text-blue-600 text-sm p-3 rounded-lg">
             <AlertCircle class="w-4 h-4 inline mr-2" />
-            记得对合并后的模型运行评估以验证性能
+            SWA 通过平均多个检查点的权重来提高模型稳定性和泛化能力
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useJobsStore } from '@/stores/jobs'
+import { useDatasetsStore } from '@/stores/datasets'
 import * as api from '@/api'
 import {
   Database,
@@ -28,7 +28,7 @@ import {
   TrendingUp
 } from 'lucide-vue-next'
 
-const jobsStore = useJobsStore()
+const datasetsStore = useDatasetsStore()
 const loading = ref(false)
 const trainingDatasets = ref([])
 const selectedDataset = ref(null)
@@ -54,10 +54,17 @@ const uploadForm = ref({
 })
 const uploadFile = ref(null)
 const uploading = ref(false)
+const uploadProgress = ref(0)
+const uploadStage = ref('')  // 'uploading' | 'processing'
 const detectedFormat = ref(null)  // 'messages' or 'prompt_response' or null
 const detectedColumns = ref([])  // Detected columns from file
 const selectedLabelFields = ref([])  // Selected label fields
 const syncing = ref({})  // Track syncing status per dataset uuid
+const editingLabels = ref(false)  // Track if editing label fields
+const editLabelFields = ref([])  // Label fields being edited
+const savingLabels = ref(false)  // Track saving state
+const reanalyzing = ref(false)  // Track reanalyze state
+const displayDistFields = ref([])  // Which fields to display in distribution view
 
 const getSyncStatusInfo = (status) => {
   const statusMap = {
@@ -95,6 +102,75 @@ const formatFileSize = (mb) => {
   return `${(mb / 1024).toFixed(2)} GB`
 }
 
+// Label field editing
+const startEditLabels = () => {
+  editLabelFields.value = [...(selectedDataset.value.label_fields || [])]
+  editingLabels.value = true
+}
+
+const cancelEditLabels = () => {
+  editingLabels.value = false
+  editLabelFields.value = []
+}
+
+const saveLabels = async () => {
+  savingLabels.value = true
+  try {
+    const result = await api.configureTrainingDatasetLabels(selectedDataset.value.uuid, editLabelFields.value)
+    // Update the dataset in the list
+    const idx = trainingDatasets.value.findIndex(d => d.uuid === selectedDataset.value.uuid)
+    if (idx !== -1) {
+      trainingDatasets.value[idx] = result
+    }
+    selectedDataset.value = result
+    editingLabels.value = false
+    // Reload distribution with new label fields
+    await loadDistribution(result)
+  } catch (error) {
+    console.error('Failed to save labels:', error)
+    alert('保存失败: ' + error.message)
+  } finally {
+    savingLabels.value = false
+  }
+}
+
+// Get available label field options (columns except prompt/response/messages)
+const availableLabelColumns = computed(() => {
+  if (!selectedDataset.value?.columns) return []
+  return selectedDataset.value.columns.filter(col =>
+    col !== selectedDataset.value.prompt_field &&
+    col !== selectedDataset.value.response_field &&
+    col !== 'messages'
+  )
+})
+
+// Reanalyze dataset to re-detect labels and recompute stats
+const reanalyzeDataset = async () => {
+  if (!selectedDataset.value) return
+
+  reanalyzing.value = true
+  try {
+    const result = await api.reanalyzeTrainingDataset(selectedDataset.value.uuid, true)
+    // Update local state
+    const idx = trainingDatasets.value.findIndex(d => d.uuid === selectedDataset.value.uuid)
+    if (idx !== -1) {
+      trainingDatasets.value[idx] = result
+    }
+    selectedDataset.value = result
+    // Reload stats
+    await Promise.all([
+      loadStats(result),
+      loadQuality(result),
+      loadDistribution(result),
+    ])
+  } catch (error) {
+    console.error('Reanalyze failed:', error)
+    alert('重新分析失败: ' + error.message)
+  } finally {
+    reanalyzing.value = false
+  }
+}
+
 const getFormatColor = (format) => {
   const colors = {
     parquet: 'bg-blue-100 text-blue-600',
@@ -124,6 +200,12 @@ const selectDataset = async (dataset) => {
   currentSample.value = null
   datasetStats.value = null
   qualityCheck.value = null
+  // Reset label editing state
+  editingLabels.value = false
+  editLabelFields.value = []
+
+  // Persist selection in store
+  datasetsStore.setSelectedDataset(dataset.uuid)
 
   // Load stats and quality in parallel
   await Promise.all([
@@ -179,10 +261,17 @@ const getQualityColor = (score) => {
 const loadDistribution = async (dataset) => {
   try {
     distribution.value = await api.getTrainingDatasetDistribution(dataset.uuid)
+    // Initialize display fields with all available distribution fields
+    displayDistFields.value = distribution.value.map(d => d.field)
   } catch (error) {
     console.error('Failed to load distribution:', error)
   }
 }
+
+// Computed: filtered distribution based on selected display fields
+const filteredDistribution = computed(() => {
+  return distribution.value.filter(d => displayDistFields.value.includes(d.field))
+})
 
 const loadSample = async (dataset, index) => {
   previewLoading.value = true
@@ -233,39 +322,76 @@ const handleFileSelect = async (e) => {
     uploadForm.value.name = file.name.replace(/\.[^/.]+$/, '')
   }
 
-  // Auto-detect format and columns by reading first line
+  // Auto-detect format and columns
   detectedFormat.value = null
   detectedColumns.value = []
   selectedLabelFields.value = []
   try {
-    const text = await file.slice(0, 10000).text()  // Read first 10KB
-    const firstLine = text.split('\n')[0]
-    if (firstLine) {
-      const parsed = JSON.parse(firstLine)
+    // Read more data for JSON array detection
+    const text = await file.slice(0, 50000).text()  // Read first 50KB
+    let parsed = null
+    let records = []
 
+    // Try JSONL format first (first line is a complete JSON object)
+    const firstLine = text.split('\n')[0].trim()
+    if (firstLine.startsWith('{')) {
+      parsed = JSON.parse(firstLine)
+      // For JSONL, try to get a few more records for better detection
+      const lines = text.split('\n').filter(l => l.trim())
+      records = lines.slice(0, 10).map(l => {
+        try { return JSON.parse(l) } catch { return null }
+      }).filter(Boolean)
+    } else if (firstLine.startsWith('[')) {
+      // JSON array format - need to parse the whole thing
+      try {
+        const fullText = await file.text()
+        const arr = JSON.parse(fullText)
+        if (Array.isArray(arr) && arr.length > 0) {
+          parsed = arr[0]
+          records = arr.slice(0, 100)
+        }
+      } catch {
+        console.warn('Could not parse JSON array')
+      }
+    }
+
+    if (parsed) {
       // Detect all columns
       const columns = Object.keys(parsed)
 
       if (parsed.messages && Array.isArray(parsed.messages)) {
         detectedFormat.value = 'messages'
-        // For messages format, exclude 'messages' from label field options
         detectedColumns.value = columns.filter(c => c !== 'messages')
       } else if (parsed.prompt !== undefined || parsed.response !== undefined) {
         detectedFormat.value = 'prompt_response'
-        // Exclude prompt/response fields from label options
         detectedColumns.value = columns.filter(c =>
           c !== uploadForm.value.promptField && c !== uploadForm.value.responseField
         )
       } else {
-        // Unknown format, show all columns
         detectedColumns.value = columns
       }
 
-      // Auto-select common label fields
-      const commonLabels = ['domain', 'intent', 'category', 'type', 'difficulty', 'product', 'scenario']
-      selectedLabelFields.value = detectedColumns.value.filter(c =>
-        commonLabels.includes(c.toLowerCase())
-      )
+      // Smart label detection: short strings with reasonable cardinality
+      if (records.length > 0) {
+        const labelCandidates = []
+        for (const col of detectedColumns.value) {
+          const values = records.map(r => r[col]).filter(v => v != null && typeof v !== 'object')
+          if (values.length >= records.length * 0.5) {
+            // Convert to strings for length check
+            const strValues = values.map(v => String(v))
+            const avgLen = strValues.reduce((a, b) => a + b.length, 0) / strValues.length
+            const uniqueCount = new Set(strValues).size
+            // Good label criteria:
+            // 1. Short values (avg < 100 chars) - not long text content
+            // 2. Low unique count OR low unique ratio - categorical data
+            // uniqueCount < 50 catches small datasets, uniqueRatio < 0.5 catches larger ones
+            if (avgLen < 100 && (uniqueCount < 50 || uniqueCount / values.length < 0.5)) {
+              labelCandidates.push(col)
+            }
+          }
+        }
+        selectedLabelFields.value = labelCandidates
+      }
     }
   } catch (err) {
     console.warn('Could not detect format:', err)
@@ -276,6 +402,9 @@ const handleUpload = async () => {
   if (!uploadFile.value || !uploadForm.value.name) return
 
   uploading.value = true
+  uploadProgress.value = 0
+  uploadStage.value = 'uploading'
+
   try {
     const formData = new FormData()
     formData.append('file', uploadFile.value)
@@ -291,7 +420,13 @@ const handleUpload = async () => {
       params.label_fields = selectedLabelFields.value.join(',')
     }
 
-    await api.uploadTrainingDataset(formData, params)
+    await api.uploadTrainingDataset(formData, params, (progress) => {
+      uploadProgress.value = progress
+      if (progress >= 100) {
+        uploadStage.value = 'processing'
+      }
+    })
+
     showUploadModal.value = false
     uploadForm.value = { name: '', description: '', labelFields: '', promptField: 'prompt', responseField: 'response' }
     uploadFile.value = null
@@ -300,23 +435,31 @@ const handleUpload = async () => {
     await fetchTrainingDatasets()
   } catch (error) {
     console.error('Upload failed:', error)
-    alert('Upload failed: ' + error.message)
+    alert('上传失败: ' + error.message)
   } finally {
     uploading.value = false
+    uploadProgress.value = 0
+    uploadStage.value = ''
   }
 }
 
 const deleteDataset = async (dataset) => {
-  if (!confirm(`Delete dataset "${dataset.name}"?`)) return
+  if (!confirm(`确定删除数据集 "${dataset.name}"?`)) return
+
+  // Immediately remove from local list for better UX
+  trainingDatasets.value = trainingDatasets.value.filter(d => d.uuid !== dataset.uuid)
+  if (selectedDataset.value?.uuid === dataset.uuid) {
+    selectedDataset.value = null
+    datasetsStore.clearSelectedDataset()
+  }
 
   try {
     await api.deleteTrainingDataset(dataset.uuid)
-    if (selectedDataset.value?.uuid === dataset.uuid) {
-      selectedDataset.value = null
-    }
-    await fetchTrainingDatasets()
   } catch (error) {
     console.error('Delete failed:', error)
+    alert('删除失败: ' + error.message)
+    // Refresh list to restore if delete failed
+    await fetchTrainingDatasets()
   }
 }
 
@@ -330,6 +473,15 @@ const getDistributionChartData = (dist) => {
 
 onMounted(async () => {
   await fetchTrainingDatasets()
+
+  // Restore selection from store if present
+  const savedUuid = datasetsStore.selectedDatasetUuid
+  if (savedUuid && trainingDatasets.value.length > 0) {
+    const dataset = trainingDatasets.value.find(d => d.uuid === savedUuid)
+    if (dataset) {
+      await selectDataset(dataset)
+    }
+  }
 })
 </script>
 
@@ -770,9 +922,31 @@ onMounted(async () => {
                 <p class="text-2xs text-gray-400 mt-1">在设置中配置标签字段</p>
               </div>
 
-              <div v-else class="grid grid-cols-2 gap-4">
+              <div v-else>
+                <!-- Field selector -->
+                <div class="mb-4 flex flex-wrap items-center gap-2">
+                  <span class="text-xs text-gray-500">显示字段:</span>
+                  <label
+                    v-for="dist in distribution"
+                    :key="dist.field"
+                    class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors text-xs"
+                    :class="displayDistFields.includes(dist.field) ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                  >
+                    <input
+                      type="checkbox"
+                      :value="dist.field"
+                      v-model="displayDistFields"
+                      class="w-3 h-3 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                    />
+                    {{ dist.field }}
+                    <span class="text-2xs opacity-70">({{ Object.keys(dist.distribution).length }})</span>
+                  </label>
+                </div>
+
+                <!-- Distribution charts -->
+                <div class="grid grid-cols-2 gap-4">
                 <div
-                  v-for="dist in distribution"
+                  v-for="dist in filteredDistribution"
                   :key="dist.field"
                   class="bg-gray-50 rounded-lg p-4"
                 >
@@ -783,10 +957,10 @@ onMounted(async () => {
                       :key="item.name"
                       class="flex items-center gap-2"
                     >
-                      <div class="flex-1">
-                        <div class="flex justify-between text-xs mb-1">
-                          <span class="text-gray-700">{{ item.name }}</span>
-                          <span class="text-gray-500">{{ item.value }} ({{ ((item.value / dist.total) * 100).toFixed(1) }}%)</span>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex justify-between text-xs mb-1 gap-2">
+                          <span class="text-gray-700 truncate flex-1" :title="item.name">{{ item.name }}</span>
+                          <span class="text-gray-500 whitespace-nowrap">{{ item.value }} ({{ ((item.value / dist.total) * 100).toFixed(1) }}%)</span>
                         </div>
                         <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
@@ -800,6 +974,7 @@ onMounted(async () => {
                   <div class="mt-3 pt-3 border-t border-gray-200 text-2xs text-gray-500">
                     共 {{ dist.total.toLocaleString() }} 条 · {{ Object.keys(dist.distribution).length }} 个类别
                   </div>
+                </div>
                 </div>
               </div>
             </div>
@@ -869,17 +1044,69 @@ onMounted(async () => {
                 </div>
 
                 <div class="bg-gray-50 rounded-lg p-4">
-                  <h4 class="text-sm font-medium text-gray-700 mb-3">标签字段</h4>
-                  <div v-if="selectedDataset.label_fields?.length > 0" class="flex flex-wrap gap-2">
-                    <span
-                      v-for="field in selectedDataset.label_fields"
-                      :key="field"
-                      class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-                    >
-                      {{ field }}
-                    </span>
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-medium text-gray-700">标签字段</h4>
+                    <div v-if="!editingLabels">
+                      <button
+                        @click="startEditLabels"
+                        class="text-xs text-primary-600 hover:text-primary-700"
+                      >
+                        编辑
+                      </button>
+                    </div>
                   </div>
-                  <p v-else class="text-xs text-gray-500">未配置标签字段</p>
+
+                  <!-- View Mode -->
+                  <div v-if="!editingLabels">
+                    <div v-if="selectedDataset.label_fields?.length > 0" class="flex flex-wrap gap-2">
+                      <span
+                        v-for="field in selectedDataset.label_fields"
+                        :key="field"
+                        class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
+                      >
+                        {{ field }}
+                      </span>
+                    </div>
+                    <p v-else class="text-xs text-gray-500">未配置标签字段，点击编辑添加</p>
+                  </div>
+
+                  <!-- Edit Mode -->
+                  <div v-else class="space-y-3">
+                    <div v-if="availableLabelColumns.length > 0" class="flex flex-wrap gap-2">
+                      <label
+                        v-for="col in availableLabelColumns"
+                        :key="col"
+                        class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors"
+                        :class="editLabelFields.includes(col) ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'"
+                      >
+                        <input
+                          type="checkbox"
+                          :value="col"
+                          v-model="editLabelFields"
+                          class="w-3.5 h-3.5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
+                        />
+                        <span class="text-xs">{{ col }}</span>
+                      </label>
+                    </div>
+                    <p v-else class="text-xs text-gray-500">没有可用的标签字段</p>
+
+                    <div class="flex gap-2 pt-2">
+                      <button
+                        @click="saveLabels"
+                        :disabled="savingLabels"
+                        class="btn-primary text-xs px-3 py-1.5"
+                      >
+                        {{ savingLabels ? '保存中...' : '保存' }}
+                      </button>
+                      <button
+                        @click="cancelEditLabels"
+                        :disabled="savingLabels"
+                        class="btn-secondary text-xs px-3 py-1.5"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Remote Sync Status -->
@@ -938,6 +1165,29 @@ onMounted(async () => {
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <!-- Reanalyze Dataset -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                  <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <RefreshCw class="w-4 h-4" />
+                    数据分析
+                  </h4>
+                  <p class="text-xs text-gray-500 mb-3">
+                    重新分析数据集以更新统计信息和自动检测标签字段
+                  </p>
+                  <button
+                    @click="reanalyzeDataset"
+                    :disabled="reanalyzing"
+                    class="btn-secondary text-xs flex items-center gap-1.5"
+                  >
+                    <Loader2 v-if="reanalyzing" class="w-3.5 h-3.5 animate-spin" />
+                    <RefreshCw v-else class="w-3.5 h-3.5" />
+                    {{ reanalyzing ? '分析中...' : '重新分析' }}
+                  </button>
+                  <p v-if="selectedDataset.analyzed_at" class="text-2xs text-gray-400 mt-2">
+                    上次分析: {{ new Date(selectedDataset.analyzed_at).toLocaleString() }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1050,10 +1300,37 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Upload Progress -->
+        <div v-if="uploading" class="mt-4 p-3 bg-gray-50 rounded-lg">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs text-gray-600">
+              {{ uploadStage === 'processing' ? '处理中...' : '上传中...' }}
+            </span>
+            <span v-if="uploadStage !== 'processing'" class="text-xs text-gray-500">{{ uploadProgress }}%</span>
+          </div>
+          <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <!-- Processing: indeterminate animated bar -->
+            <div
+              v-if="uploadStage === 'processing'"
+              class="h-full w-1/3 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400 rounded-full animate-indeterminate"
+            />
+            <!-- Uploading: normal progress bar -->
+            <div
+              v-else
+              class="h-full bg-primary-500 transition-all duration-300"
+              :style="{ width: uploadProgress + '%' }"
+            />
+          </div>
+          <p v-if="uploadStage === 'processing'" class="text-2xs text-gray-500 mt-1.5">
+            正在分析数据集结构和计算统计信息...
+          </p>
+        </div>
+
         <div class="flex justify-end gap-3 mt-6">
           <button
             @click="showUploadModal = false"
-            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+            :disabled="uploading"
+            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50"
           >
             取消
           </button>
@@ -1062,7 +1339,7 @@ onMounted(async () => {
             :disabled="uploading || !uploadFile || !uploadForm.name"
             class="btn-primary text-sm"
           >
-            {{ uploading ? '上传中...' : '上传' }}
+            {{ uploading ? (uploadStage === 'processing' ? '处理中...' : '上传中...') : '上传' }}
           </button>
         </div>
       </div>

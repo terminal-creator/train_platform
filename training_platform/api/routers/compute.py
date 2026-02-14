@@ -105,15 +105,28 @@ async def list_gpu_types() -> Dict[str, Any]:
     """
     return {
         "gpu_types": [
-            # NVIDIA GPUs (CUDA backend)
+            # Consumer GPUs (CUDA backend)
+            {"id": "RTX3090", "name": "NVIDIA RTX 3090", "memory_gb": 24, "fp16_tflops": 71, "backend": "cuda"},
+            {"id": "RTX4080", "name": "NVIDIA RTX 4080", "memory_gb": 16, "fp16_tflops": 65, "backend": "cuda"},
+            {"id": "RTX4090", "name": "NVIDIA RTX 4090", "memory_gb": 24, "fp16_tflops": 82.6, "backend": "cuda"},
+            {"id": "RTX5090", "name": "NVIDIA RTX 5090", "memory_gb": 32, "fp16_tflops": 209, "backend": "cuda"},
+            # Data Center GPUs - A-series
             {"id": "A100-40G", "name": "NVIDIA A100 40GB", "memory_gb": 40, "fp16_tflops": 312, "backend": "cuda"},
             {"id": "A100-80G", "name": "NVIDIA A100 80GB", "memory_gb": 80, "fp16_tflops": 312, "backend": "cuda"},
+            {"id": "A800-80G", "name": "NVIDIA A800 80GB", "memory_gb": 80, "fp16_tflops": 312, "backend": "cuda"},
+            # Data Center GPUs - H-series (Hopper)
             {"id": "H100-80G", "name": "NVIDIA H100 80GB", "memory_gb": 80, "fp16_tflops": 989, "backend": "cuda"},
             {"id": "H100-SXM", "name": "NVIDIA H100 SXM", "memory_gb": 80, "fp16_tflops": 989, "backend": "cuda"},
-            {"id": "A800-80G", "name": "NVIDIA A800 80GB", "memory_gb": 80, "fp16_tflops": 312, "backend": "cuda"},
+            {"id": "H100-NVL", "name": "NVIDIA H100 NVL", "memory_gb": 94, "fp16_tflops": 835, "backend": "cuda"},
             {"id": "H800-80G", "name": "NVIDIA H800 80GB", "memory_gb": 80, "fp16_tflops": 989, "backend": "cuda"},
-            {"id": "RTX4090", "name": "NVIDIA RTX 4090", "memory_gb": 24, "fp16_tflops": 82.6, "backend": "cuda"},
+            {"id": "H200-141G", "name": "NVIDIA H200 141GB", "memory_gb": 141, "fp16_tflops": 989, "backend": "cuda"},
+            # Data Center GPUs - L-series
+            {"id": "L40", "name": "NVIDIA L40", "memory_gb": 48, "fp16_tflops": 181, "backend": "cuda"},
             {"id": "L40S", "name": "NVIDIA L40S", "memory_gb": 48, "fp16_tflops": 362, "backend": "cuda"},
+            # Data Center GPUs - B-series (Blackwell)
+            {"id": "B100", "name": "NVIDIA B100", "memory_gb": 192, "fp16_tflops": 1800, "backend": "cuda"},
+            {"id": "B200", "name": "NVIDIA B200", "memory_gb": 192, "fp16_tflops": 2250, "backend": "cuda"},
+            {"id": "GB200", "name": "NVIDIA GB200", "memory_gb": 384, "fp16_tflops": 4500, "backend": "cuda"},
             # Apple Silicon (MPS backend)
             {"id": "M1-Max-32G", "name": "Apple M1 Max 32GB", "memory_gb": 32, "fp16_tflops": 10.4, "backend": "mps"},
             {"id": "M1-Max-64G", "name": "Apple M1 Max 64GB", "memory_gb": 64, "fp16_tflops": 10.4, "backend": "mps"},
@@ -137,13 +150,21 @@ async def list_model_sizes() -> Dict[str, Any]:
     """
     return {
         "model_sizes": [
+            # Qwen 系列
             {"id": "0.5B", "name": "0.5B", "params_billion": 0.5, "hidden_size": 896, "num_layers": 24},
+            {"id": "0.6B", "name": "0.6B", "params_billion": 0.6, "hidden_size": 1024, "num_layers": 24},
             {"id": "1.5B", "name": "1.5B", "params_billion": 1.5, "hidden_size": 1536, "num_layers": 28},
             {"id": "3B", "name": "3B", "params_billion": 3, "hidden_size": 2048, "num_layers": 36},
             {"id": "7B", "name": "7B", "params_billion": 7, "hidden_size": 3584, "num_layers": 28},
+            {"id": "8B", "name": "8B", "params_billion": 8, "hidden_size": 4096, "num_layers": 32},
             {"id": "14B", "name": "14B", "params_billion": 14, "hidden_size": 5120, "num_layers": 40},
             {"id": "32B", "name": "32B", "params_billion": 32, "hidden_size": 5120, "num_layers": 64},
+            {"id": "70B", "name": "70B", "params_billion": 70, "hidden_size": 8192, "num_layers": 80},
             {"id": "72B", "name": "72B", "params_billion": 72, "hidden_size": 8192, "num_layers": 80},
+            {"id": "110B", "name": "110B", "params_billion": 110, "hidden_size": 10240, "num_layers": 96},
+            {"id": "235B", "name": "235B", "params_billion": 235, "hidden_size": 12288, "num_layers": 120},
+            {"id": "405B", "name": "405B", "params_billion": 405, "hidden_size": 16384, "num_layers": 126},
+            {"id": "671B", "name": "671B", "params_billion": 671, "hidden_size": 16384, "num_layers": 160},
         ]
     }
 

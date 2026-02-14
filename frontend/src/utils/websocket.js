@@ -207,7 +207,8 @@ export function createJobMetricsWS(jobId, options = {}) {
   }
 
   return new ReconnectingWebSocket(getUrl, {
-    debug: true,
+    debug: false,
+    maxReconnectAttempts: 3,
     ...options
   })
 }
@@ -223,7 +224,8 @@ export function createJobLogsWS(jobId, options = {}) {
   }
 
   return new ReconnectingWebSocket(getUrl, {
-    debug: true,
+    debug: false,
+    maxReconnectAttempts: 3,
     ...options
   })
 }
@@ -239,7 +241,8 @@ export function createDashboardWS(options = {}) {
   }
 
   return new ReconnectingWebSocket(getUrl, {
-    debug: true,
+    debug: false,
+    maxReconnectAttempts: 3,
     ...options
   })
 }

@@ -86,30 +86,32 @@ async def list_tasks(
     Returns:
         任务列表
     """
-    # 获取活跃任务
-    inspect = app.control.inspect()
-
     tasks = []
 
-    # 获取各种状态的任务
-    active_tasks = inspect.active() or {}
-    scheduled_tasks = inspect.scheduled() or {}
-    reserved_tasks = inspect.reserved() or {}
+    try:
+        # 获取活跃任务，设置超时
+        inspect = app.control.inspect(timeout=2.0)
 
-    # 收集所有任务
-    for worker, worker_tasks in active_tasks.items():
-        for task in worker_tasks[:limit]:
-            if state and task.get('type', '').split('.')[-1] != state.lower():
-                continue
-            tasks.append(TaskDetail(
-                task_id=task.get('id', ''),
-                name=task.get('name', ''),
-                state='STARTED',
-                result=None,
-                traceback=None,
-                args=task.get('args'),
-                kwargs=task.get('kwargs'),
-            ))
+        # 获取各种状态的任务
+        active_tasks = inspect.active() or {}
+
+        # 收集所有任务
+        for worker, worker_tasks in active_tasks.items():
+            for task in worker_tasks[:limit]:
+                if state and task.get('type', '').split('.')[-1] != state.lower():
+                    continue
+                tasks.append(TaskDetail(
+                    task_id=task.get('id', ''),
+                    name=task.get('name', ''),
+                    state='STARTED',
+                    result=None,
+                    traceback=None,
+                    args=task.get('args'),
+                    kwargs=task.get('kwargs'),
+                ))
+    except Exception as e:
+        # Celery not available, return empty list
+        pass
 
     return TaskListResponse(
         tasks=tasks,
@@ -202,32 +204,47 @@ async def get_tasks_stats() -> Dict[str, Any]:
     Returns:
         任务统计信息
     """
-    inspect = app.control.inspect()
-
-    # 获取各种统计
-    stats = inspect.stats() or {}
-    active_tasks = inspect.active() or {}
-    scheduled_tasks = inspect.scheduled() or {}
-    reserved_tasks = inspect.reserved() or {}
-    registered_tasks = inspect.registered() or {}
-
-    # 计算总数
-    total_active = sum(len(tasks) for tasks in active_tasks.values())
-    total_scheduled = sum(len(tasks) for tasks in scheduled_tasks.values())
-    total_reserved = sum(len(tasks) for tasks in reserved_tasks.values())
-
-    # 获取 worker 信息
-    workers = list(stats.keys()) if stats else []
-
-    return {
-        "workers": workers,
-        "worker_count": len(workers),
-        "active_tasks": total_active,
-        "scheduled_tasks": total_scheduled,
-        "reserved_tasks": total_reserved,
-        "registered_tasks": len(list(registered_tasks.values())[0]) if registered_tasks else 0,
-        "stats": stats,
+    # Default response when Celery is not available
+    default_response = {
+        "workers": [],
+        "worker_count": 0,
+        "active_tasks": 0,
+        "scheduled_tasks": 0,
+        "reserved_tasks": 0,
+        "registered_tasks": 0,
+        "stats": {},
     }
+
+    try:
+        inspect = app.control.inspect(timeout=2.0)
+
+        # 获取各种统计
+        stats = inspect.stats() or {}
+        active_tasks = inspect.active() or {}
+        scheduled_tasks = inspect.scheduled() or {}
+        reserved_tasks = inspect.reserved() or {}
+        registered_tasks = inspect.registered() or {}
+
+        # 计算总数
+        total_active = sum(len(tasks) for tasks in active_tasks.values())
+        total_scheduled = sum(len(tasks) for tasks in scheduled_tasks.values())
+        total_reserved = sum(len(tasks) for tasks in reserved_tasks.values())
+
+        # 获取 worker 信息
+        workers = list(stats.keys()) if stats else []
+
+        return {
+            "workers": workers,
+            "worker_count": len(workers),
+            "active_tasks": total_active,
+            "scheduled_tasks": total_scheduled,
+            "reserved_tasks": total_reserved,
+            "registered_tasks": len(list(registered_tasks.values())[0]) if registered_tasks else 0,
+            "stats": stats,
+        }
+    except Exception as e:
+        # Celery not available
+        return default_response
 
 
 @router.post("/purge")

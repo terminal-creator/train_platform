@@ -2,8 +2,12 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+# Use Aliyun mirror for faster downloads in China
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     git \
@@ -12,14 +16,15 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (using Aliyun mirror)
+RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 
 # Install Celery and related packages
 RUN pip install --no-cache-dir \
-    celery[redis]==5.3.4 \
-    flower==2.0.1 \
-    redis==5.0.1
+    "celery[redis]==5.3.4" \
+    "flower==2.0.1" \
+    "redis==4.6.0" \
+    -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
 
 # Copy application code
 COPY training_platform /app/training_platform
